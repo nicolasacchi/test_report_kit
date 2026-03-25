@@ -1,0 +1,78 @@
+<%# Slowest examples %>
+<% if slowest_tests.any? -%>
+<div class="table-wrap">
+  <div class="table-header">
+    <div class="table-title">Slowest Examples (top 20)</div>
+  </div>
+  <div style="max-height: 400px; overflow-y: auto;">
+  <table>
+    <thead>
+      <tr>
+        <th data-sort>Example</th>
+        <th data-sort>File</th>
+        <th data-sort>Duration</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% slowest_tests.each do |t| -%>
+      <tr>
+        <td style="color: var(--text-primary); max-width: 400px;"><%= h(t[:description]) %></td>
+        <td><span class="file-path"><%= h(t[:file]) %></span></td>
+        <td><span class="num" style="color: <%= t[:slow] ? 'var(--red)' : 'var(--yellow)' %>; font-weight: 700;"><%= t[:duration] %>s</span></td>
+        <td><span class="badge badge-<%= t[:status] == 'passed' ? 'pass' : 'fail' %>"><%= t[:status] == 'passed' ? 'pass' : t[:status] %></span></td>
+      </tr>
+      <% end -%>
+    </tbody>
+  </table>
+  </div>
+</div>
+<% else -%>
+<div class="empty-state">No test performance data available.</div>
+<% end -%>
+
+<%# RSpecDissect time distribution %>
+<% if rspec_dissect_data && rspec_dissect_data["suites"]&.any? -%>
+<div class="table-wrap">
+  <div class="table-header">
+    <div class="table-title">Time Distribution (RSpecDissect)</div>
+  </div>
+  <div style="padding: 16px 20px 4px;">
+    <div class="time-legend">
+      <span><span class="time-legend-dot" style="background: var(--red); opacity: 0.7;"></span> before hooks</span>
+      <span><span class="time-legend-dot" style="background: var(--yellow); opacity: 0.7;"></span> let declarations</span>
+      <span><span class="time-legend-dot" style="background: var(--green); opacity: 0.7;"></span> examples</span>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Total</th>
+        <th>Distribution</th>
+        <th data-sort>before</th>
+        <th data-sort>let</th>
+        <th data-sort>examples</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rspec_dissect_data["suites"].each do |suite| -%>
+      <tr>
+        <td><span class="file-path"><%= h(suite["location"]) %></span></td>
+        <td><span class="num"><%= suite["total_time"] %></span></td>
+        <td>
+          <div class="time-bar">
+            <div class="time-bar-before" style="width: <%= suite["before_pct"] || 0 %>%;"></div>
+            <div class="time-bar-let" style="width: <%= suite["let_pct"] || 0 %>%;"></div>
+            <div class="time-bar-example" style="width: <%= suite["example_pct"] || 0 %>%;"></div>
+          </div>
+        </td>
+        <td><span class="num" style="color: var(--red);"><%= suite["before_time"] %> (<%= suite["before_pct"] ? "#{suite["before_pct"].round(0)}%" : "—" %>)</span></td>
+        <td><span class="num" style="color: var(--yellow);"><%= suite["let_time"] %> (<%= suite["let_pct"] ? "#{suite["let_pct"].round(0)}%" : "—" %>)</span></td>
+        <td><span class="num" style="color: var(--green);"><%= suite["example_time"] %> (<%= suite["example_pct"] ? "#{suite["example_pct"].round(0)}%" : "—" %>)</span></td>
+      </tr>
+      <% end -%>
+    </tbody>
+  </table>
+</div>
+<% end -%>

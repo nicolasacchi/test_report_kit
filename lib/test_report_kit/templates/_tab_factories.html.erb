@@ -1,0 +1,48 @@
+<% if factory_health -%>
+
+<div class="table-wrap">
+  <div class="table-header">
+    <div class="table-title">Factory Usage Ranking</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th data-sort>Factory</th>
+        <th data-sort>Creates</th>
+        <th data-sort>Top-Level</th>
+        <th data-sort>Cascade Ratio</th>
+        <th data-sort>Time</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% factory_health[:stats].each do |s| -%>
+      <tr>
+        <td><span class="num" style="color: var(--cyan); font-weight: 600;">:<%= h(s[:name]) %></span></td>
+        <td><span class="num" style="color: <%= s[:total_count] >= 1000 ? 'var(--red)' : s[:total_count] >= 500 ? 'var(--orange)' : 'var(--text-secondary)' %>; font-weight: 700;"><%= format_number(s[:total_count]) %></span></td>
+        <td><span class="num"><%= format_number(s[:top_level_count]) %></span></td>
+        <td><span class="risk-score" style="background: <%= s[:cascade_ratio] >= 5 ? 'var(--red-dim)' : s[:cascade_ratio] >= 3 ? 'var(--yellow-dim)' : 'var(--green-dim)' %>; color: <%= s[:cascade_ratio] >= 5 ? 'var(--red)' : s[:cascade_ratio] >= 3 ? 'var(--yellow)' : 'var(--green)' %>;"><%= s[:cascade_ratio] %>x</span></td>
+        <td><span class="num"><%= s[:total_time].is_a?(Numeric) ? "#{s[:total_time].round(1)}s" : s[:total_time] %></span></td>
+      </tr>
+      <% end -%>
+    </tbody>
+  </table>
+</div>
+
+<%# Suggestions %>
+<% if factory_health[:suggestions]&.any? -%>
+<div class="insight-section">
+  <div class="insight-header">
+    <div class="insight-icon" style="background: var(--yellow-dim); color: var(--yellow);">&#128161;</div>
+    <div class="insight-title">Optimization Suggestions</div>
+  </div>
+  <% factory_health[:suggestions].each do |s| -%>
+  <div class="suggestion">
+    <strong style="color: <%= severity_color(s[:severity]) %>;"><%= s[:severity] %>:</strong> <%= s[:message] %>
+  </div>
+  <% end -%>
+</div>
+<% end -%>
+
+<% else -%>
+<div class="empty-state">No factory profiling data available. Run tests with <code>FPROF=json</code> enabled.</div>
+<% end -%>
