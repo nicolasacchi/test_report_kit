@@ -26,6 +26,7 @@ module TestReportKit
     def initialize(coverage_data:, config: TestReportKit.configuration)
       @coverage_data = coverage_data
       @config = config
+      @coverage_index = build_coverage_index
     end
 
     def call
@@ -159,35 +160,26 @@ module TestReportKit
 
     def group_consecutive_lines(lines)
       return [] if lines.empty?
-      sorted = lines.sort
-      groups = [[sorted.first]]
-      sorted[1..].each do |line|
-        if line == groups.last.last + 1
-          groups.last << line
-        else
-          groups << [line]
-        end
-      end
-      groups
+      lines.sort.chunk_while { |a, b| b == a + 1 }.to_a
     end
 
     def find_coverage(absolute_path)
-      return nil unless @coverage_data
+      relative = absolute_path.sub(%r{^#{Regexp.escape(@config.project_root)}/?}, "")
+      @coverage_index[absolute_path] || @coverage_index[relative]
+    end
 
-      # Try exact match first, then try matching by relative suffix
-      if @coverage_data.key?(absolute_path)
-        data = @coverage_data[absolute_path]
-        return data.is_a?(Hash) ? data["lines"] : data
-      end
+    def build_coverage_index
+      index = {}
+      return index unless @coverage_data
 
-      # Fallback: match by filename suffix (handles different project roots)
       @coverage_data.each do |path, data|
-        if path.end_with?(absolute_path.sub(@config.project_root, ""))
-          return data.is_a?(Hash) ? data["lines"] : data
-        end
+        lines = data.is_a?(Hash) ? data["lines"] : data
+        index[path] = lines
+        # Also index by relative path suffix
+        relative = path.sub(%r{^#{Regexp.escape(@config.project_root)}/?}, "")
+        index[relative] = lines
       end
-
-      nil
+      index
     end
 
     def run_git_diff

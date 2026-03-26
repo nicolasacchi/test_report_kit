@@ -86,7 +86,8 @@ module TestReportKit
       path = File.join(@config.output_dir, "resource_usage.json")
       return nil unless File.exist?(path)
       JSON.parse(File.read(path))[field]
-    rescue StandardError
+    rescue StandardError => e
+      warn "TestReportKit: Failed to load resource field '#{field}': #{e.message}"
       nil
     end
 
@@ -94,7 +95,8 @@ module TestReportKit
       path = File.join(@config.output_dir, "previous_summary.json")
       return nil unless File.exist?(path)
       JSON.parse(File.read(path))
-    rescue JSON::ParserError
+    rescue JSON::ParserError => e
+      warn "TestReportKit: Failed to parse previous summary: #{e.message}"
       nil
     end
 

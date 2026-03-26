@@ -104,20 +104,14 @@ module TestReportKit
          .max_by { |f| File.mtime(f) }
     end
 
-    def event_prof_path
-      candidates = [
-        File.join(@config.output_dir, "event_prof.json"),
-        File.join(@config.project_root, "tmp", "test_prof", "event_prof.json")
-      ]
-      candidates.find { |p| File.exist?(p) }
-    end
+    def event_prof_path    = find_prof_file("event_prof")
+    def rspec_dissect_path = find_prof_file("rspec_dissect")
 
-    def rspec_dissect_path
-      candidates = [
-        File.join(@config.output_dir, "rspec_dissect.json"),
-        File.join(@config.project_root, "tmp", "test_prof", "rspec_dissect.json")
-      ]
-      candidates.find { |p| File.exist?(p) }
+    def find_prof_file(name)
+      [
+        File.join(@config.output_dir, "#{name}.json"),
+        File.join(@config.project_root, "tmp", "test_prof", "#{name}.json")
+      ].find { |p| File.exist?(p) }
     end
 
     def git_churn_path

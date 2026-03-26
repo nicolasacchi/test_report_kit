@@ -2,6 +2,12 @@
 
 require "fileutils"
 require "json"
+require_relative "data_loader"
+require_relative "diff_coverage"
+require_relative "metrics_calculator"
+require_relative "generator"
+require_relative "summary_exporter"
+require_relative "markdown_exporter"
 
 module TestReportKit
   class Runner
@@ -22,35 +28,18 @@ module TestReportKit
 
     private
 
-    def run_full
-      validate_dependencies
-      setup_simplecov
-      rspec_exit = run_rspec(profiling: true, coverage: true)
+    def run_full    = run_pipeline(coverage: true, profiling: true)
+    def run_coverage = run_pipeline(coverage: true, profiling: false)
+    def run_profile  = run_pipeline(coverage: false, profiling: true)
+    def run_generate = (generate_report; 0)
+
+    def run_pipeline(coverage:, profiling:)
+      validate_dependencies(require_simplecov: coverage, require_test_prof: profiling)
+      setup_simplecov if coverage
+      rspec_exit = run_rspec(profiling: profiling, coverage: coverage)
       compute_git_churn
       generate_report
       rspec_exit
-    end
-
-    def run_coverage
-      validate_dependencies(require_test_prof: false)
-      setup_simplecov
-      rspec_exit = run_rspec(profiling: false, coverage: true)
-      compute_git_churn
-      generate_report
-      rspec_exit
-    end
-
-    def run_profile
-      validate_dependencies(require_simplecov: false)
-      rspec_exit = run_rspec(profiling: true, coverage: false)
-      compute_git_churn
-      generate_report
-      rspec_exit
-    end
-
-    def run_generate
-      generate_report
-      0
     end
 
     # ── Pipeline steps ──
@@ -156,13 +145,6 @@ module TestReportKit
     end
 
     def generate_report
-      require_relative "data_loader"
-      require_relative "diff_coverage"
-      require_relative "metrics_calculator"
-      require_relative "generator"
-      require_relative "summary_exporter"
-      require_relative "markdown_exporter"
-
       loader = DataLoader.new(config: @config).load_all
 
       diff_coverage = nil
@@ -217,7 +199,8 @@ module TestReportKit
 
       path = File.join(@config.output_dir, "resource_usage.json")
       File.write(path, JSON.pretty_generate(usage))
-    rescue StandardError
+    rescue StandardError => e
+      warn "TestReportKit: #{e.message}"
       nil
     end
 
@@ -228,7 +211,8 @@ module TestReportKit
       else
         `ps -o rss= -p #{Process.pid}`.strip.to_i / 1024
       end
-    rescue StandardError
+    rescue StandardError => e
+      warn "TestReportKit: #{e.message}"
       nil
     end
 

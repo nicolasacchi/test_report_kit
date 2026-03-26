@@ -37,18 +37,13 @@ module TestReportKit
     def overall_coverage
       return nil unless @simplecov
 
-      total = 0
-      covered = 0
-      branch_total = 0
-      branch_covered = 0
+      total = covered = branch_total = branch_covered = 0
 
       @simplecov.each_value do |data|
         lines = data.is_a?(Hash) ? data["lines"] : data
-        (lines || []).each do |count|
-          next if count.nil?
-          total += 1
-          covered += 1 if count > 0
-        end
+        t, c = count_coverage(lines)
+        total += t
+        covered += c
 
         branches = data.is_a?(Hash) ? data.fetch("branches", {}) : {}
         branches.each_value do |branch_data|
@@ -59,15 +54,23 @@ module TestReportKit
         end
       end
 
+      pct = ->(c, t) { t > 0 ? (c.to_f / t * 100).round(1) : 0.0 }
       {
-        total_lines: total,
-        covered_lines: covered,
-        missed_lines: total - covered,
-        coverage_pct: total > 0 ? (covered.to_f / total * 100).round(1) : 0.0,
-        branch_total: branch_total,
-        branch_covered: branch_covered,
-        branch_coverage_pct: branch_total > 0 ? (branch_covered.to_f / branch_total * 100).round(1) : 0.0
+        total_lines: total, covered_lines: covered, missed_lines: total - covered,
+        coverage_pct: pct[covered, total],
+        branch_total: branch_total, branch_covered: branch_covered,
+        branch_coverage_pct: pct[branch_covered, branch_total]
       }
+    end
+
+    def count_coverage(lines_array)
+      total = covered = 0
+      (lines_array || []).each do |count|
+        next if count.nil?
+        total += 1
+        covered += 1 if count > 0
+      end
+      [total, covered]
     end
 
     # ── Per-file coverage ──
@@ -81,26 +84,15 @@ module TestReportKit
         lines = data.is_a?(Hash) ? data["lines"] : data
         relative = strip_to_relative(abs_path)
 
-        total = 0
-        covered = 0
-        (lines || []).each do |count|
-          next if count.nil?
-          total += 1
-          covered += 1 if count > 0
-        end
-
+        total, covered = count_coverage(lines)
         cov_pct = total > 0 ? (covered.to_f / total * 100).round(1) : 0.0
         churn = churn_files[relative] || 0
         risk = (churn * (100 - cov_pct)).round(0)
 
         branches = data.is_a?(Hash) ? data.fetch("branches", {}) : {}
-        b_total = 0
-        b_covered = 0
-        branches.each_value do |branch_data|
-          branch_data.each_value do |count|
-            b_total += 1
-            b_covered += 1 if count > 0
-          end
+        b_total = b_covered = 0
+        branches.each_value do |bd|
+          bd.each_value { |c| b_total += 1; b_covered += 1 if c > 0 }
         end
         branch_pct = b_total > 0 ? (b_covered.to_f / b_total * 100).round(1) : nil
 
@@ -141,17 +133,7 @@ module TestReportKit
         .select { |e| e["run_time"] && e["status"] != "pending" }
         .sort_by { |e| -e["run_time"] }
         .first(20)
-        .map do |e|
-          exc = e["exception"]
-          {
-            description: e["full_description"] || e["description"],
-            file: "#{e['file_path']}:#{e['line_number']}",
-            duration: e["run_time"].round(2),
-            status: e["status"],
-            slow: e["run_time"] >= @config.slow_test_threshold,
-            exception: exc ? { class: exc["class"], message: exc["message"], backtrace: (exc["backtrace"] || [])[0..4] } : nil
-          }
-        end
+        .map { |e| map_test(e) }
     end
 
     def failed_tests
@@ -159,16 +141,19 @@ module TestReportKit
 
       @rspec["examples"]
         .select { |e| e["status"] == "failed" }
-        .map do |e|
-          exc = e["exception"]
-          {
-            description: e["full_description"] || e["description"],
-            file: "#{e['file_path']}:#{e['line_number']}",
-            duration: (e["run_time"] || 0).round(2),
-            status: "failed",
-            exception: exc ? { class: exc["class"], message: exc["message"], backtrace: (exc["backtrace"] || [])[0..7] } : nil
-          }
-        end
+        .map { |e| map_test(e) }
+    end
+
+    def map_test(e)
+      exc = e["exception"]
+      {
+        description: e["full_description"] || e["description"],
+        file: "#{e['file_path']}:#{e['line_number']}",
+        duration: (e["run_time"] || 0).round(2),
+        status: e["status"],
+        slow: (e["run_time"] || 0) >= @config.slow_test_threshold,
+        exception: exc ? { class: exc["class"], message: exc["message"], backtrace: (exc["backtrace"] || [])[0..7] } : nil
+      }
     end
 
     # ── Time distribution ──
