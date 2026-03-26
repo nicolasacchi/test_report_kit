@@ -199,3 +199,19 @@ The demo app (`test_report_kit_demo`) has deliberately varying test quality:
 
 ### CI/CD
 GitHub Actions workflow: test → deploy to GitHub Pages (per-branch subdirectories with landing page).
+
+## Parallel Support
+
+**Key env vars:**
+- `TEST_REPORT_SPECS` — space-separated spec paths to run (e.g., `"spec/models/ spec/jobs/"`)
+- `TEST_ENV_NUMBER` — unique node identifier for SimpleCov command_name
+
+**ParallelMerger** (`lib/test_report_kit/parallel_merger.rb`):
+- Takes an array of artifact directories from parallel CI nodes
+- Merges: SimpleCov, RSpec results (tagged with `_node`), FactoryProf, EventProf, RSpecDissect, resource usage
+- Generates `parallel_info.json` with per-node stats and balance analysis
+- Rake task: `test_report:merge[pattern]`
+
+**Parallel tab** (`_tab_parallel.html.erb`): conditional, only shows when `parallel_info.json` exists.
+
+**Critical gotcha:** `actions/upload-artifact@v4` skips hidden files by default. SimpleCov's `.resultset.json` starts with a dot. Must set `include-hidden-files: true`.
