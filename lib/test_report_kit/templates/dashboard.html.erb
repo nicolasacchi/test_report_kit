@@ -314,6 +314,17 @@ document.querySelectorAll('.perf-test-row').forEach(row => {
   });
 });
 
+// Factory row expand/collapse
+document.querySelectorAll('.factory-row').forEach(row => {
+  row.addEventListener('click', function(e) {
+    if (e.target.closest('a')) return;
+    const detail = this.nextElementSibling;
+    if (detail?.classList.contains('factory-detail')) {
+      detail.style.display = detail.style.display === 'none' ? '' : 'none';
+    }
+  });
+});
+
 // Diff file expand/collapse
 document.querySelectorAll('.diff-file-toggle').forEach(toggle => {
   toggle.addEventListener('click', function() {

@@ -204,15 +204,29 @@ module TestReportKit
     def factory_health
       return nil unless @factory_prof
 
+      grand_total = @factory_prof["total_count"].to_f
+      grand_time = parse_factory_time(@factory_prof["total_time"])
+
       stats = (@factory_prof["stats"] || []).map do |s|
-        cascade_ratio = s["top_level_count"] > 0 ? (s["total_count"].to_f / s["top_level_count"]).round(1) : 0
+        cascade_ratio = s["top_level_count"].to_i > 0 ? (s["total_count"].to_f / s["top_level_count"]).round(1) : 0
+        dep_per_call = [(cascade_ratio - 1).round(1), 0].max
+        time_val = s["total_time"].is_a?(Numeric) ? s["total_time"] : 0
+        count_pct = grand_total > 0 ? (s["total_count"].to_f / grand_total * 100).round(1) : 0
+        time_pct = grand_time > 0 ? (time_val / grand_time * 100).round(1) : 0
+        stub_saves = (s["total_count"] * 0.5).round
+        stub_time = (time_val * 0.5).round(1)
         {
           name: s["name"],
           total_count: s["total_count"],
           top_level_count: s["top_level_count"],
           cascade_ratio: cascade_ratio,
+          dep_per_call: dep_per_call,
           total_time: s["total_time"],
-          top_level_time: s["top_level_time"]
+          top_level_time: s["top_level_time"],
+          count_pct: count_pct,
+          time_pct: time_pct,
+          stub_saves: stub_saves,
+          stub_time_saved: stub_time
         }
       end
 
@@ -334,6 +348,12 @@ module TestReportKit
       mins = (seconds / 60).floor
       secs = (seconds % 60).floor
       mins > 0 ? "#{mins}m #{secs}s" : "#{secs}s"
+    end
+
+    def parse_factory_time(str)
+      return str if str.is_a?(Numeric)
+      return 0 unless str.is_a?(String)
+      str.sub(/s$/, "").to_f
     end
   end
 end
