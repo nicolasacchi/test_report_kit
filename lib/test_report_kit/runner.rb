@@ -239,13 +239,13 @@ module TestReportKit
 
       content = File.read(log_path)
 
-      # Extract EventProf section
-      if (match = content.match(/EventProf results for .+?(?=\n\n[A-Z]|\n\nFinished|\z)/m))
+      # Extract EventProf section (stop at RSpecDissect, Finished, or end)
+      if (match = content.match(/EventProf results for .+?(?=\n\nRSpecDissect|\n\nFinished in|\n\n\d+ examples|\z)/m))
         File.write(File.join(@config.output_dir, "event_prof_output.txt"), match[0])
       end
 
-      # Extract RSpecDissect section
-      if (match = content.match(/RSpecDissect report.+?(?=\n\n[A-Z]|\n\nFinished|\z)/m))
+      # Extract RSpecDissect section (stop at EventProf, Finished, or end)
+      if (match = content.match(/RSpecDissect report.+?(?=\n\nEventProf|\n\nFinished in|\n\n\d+ examples|\z)/m))
         File.write(File.join(@config.output_dir, "rspec_dissect_output.txt"), match[0])
       end
     end
