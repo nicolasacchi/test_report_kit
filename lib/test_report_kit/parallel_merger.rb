@@ -44,7 +44,6 @@ module TestReportKit
 
     def merge_simplecov
       files = collect(".resultset.json", subdirs: ["coverage"])
-      puts "TestReportKit: SimpleCov files found: #{files.inspect}"
       return if files.empty?
 
       merged = {}
@@ -56,9 +55,7 @@ module TestReportKit
         end
       end
 
-      dest = File.join(simplecov_dir, ".resultset.json")
-      File.write(dest, JSON.pretty_generate(merged))
-      puts "TestReportKit: Merged SimpleCov → #{dest} (#{merged.keys.size} commands)"
+      File.write(File.join(simplecov_dir, ".resultset.json"), JSON.pretty_generate(merged))
     end
 
     def simplecov_dir

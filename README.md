@@ -81,6 +81,47 @@ Auto-integrates via Railtie. No manual require needed.
 
 See [demo workflow](https://github.com/nicolasacchi/test_report_kit_demo/blob/main/.github/workflows/test-report.yml) for GitHub Actions with PR comments and Pages deployment.
 
+## Parallel CI
+
+For matrix-based parallel test runs across multiple containers:
+
+```yaml
+jobs:
+  test:
+    strategy:
+      matrix:
+        include:
+          - node: 0
+            specs: "spec/models/ spec/jobs/"
+          - node: 1
+            specs: "spec/services/"
+    steps:
+      - run: bundle exec rake test_report:full
+        env:
+          TEST_ENV_NUMBER: ${{ matrix.node }}
+          TEST_REPORT_SPECS: ${{ matrix.specs }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.node }}
+          include-hidden-files: true  # required for .resultset.json
+          path: |
+            coverage/
+            tmp/test_report/
+            tmp/test_prof/
+
+  report:
+    needs: test
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      - run: bundle exec rake "test_report:merge[artifacts/test-results-*]"
+```
+
+The merge task combines coverage, RSpec results, profiler data, and resource metrics from all nodes. The Parallel tab shows per-node breakdown and balance analysis.
+
+See [parallel demo](https://nicolasacchi.github.io/test_report_kit_demo/feature-parallel-tests/) for a live example.
+
 ## Architecture
 
 Zero runtime deps on simplecov/test-prof. Reads their output files after RSpec completes.
