@@ -150,6 +150,36 @@ module TestReportKit
       code
     end
 
+    def build_file_line_data(relative_path)
+      simplecov = @data_loader.simplecov_data
+      return nil unless simplecov
+
+      abs_path = File.join(@config.project_root, relative_path)
+      cov_data = simplecov[abs_path]
+
+      # Fallback: match by suffix
+      unless cov_data
+        simplecov.each do |path, data|
+          if path.end_with?("/#{relative_path}")
+            cov_data = data
+            break
+          end
+        end
+      end
+      return nil unless cov_data
+
+      lines_array = cov_data.is_a?(Hash) ? cov_data["lines"] : cov_data
+      return nil unless lines_array
+
+      source_path = File.join(@config.project_root, relative_path)
+      return nil unless File.exist?(source_path)
+
+      source_lines = File.readlines(source_path, chomp: true)
+      source_lines.each_with_index.map do |content, idx|
+        { line: idx + 1, executed: lines_array[idx], content: content }
+      end
+    end
+
     def json_data
       {
         diff_coverage: @diff_coverage&.to_h,

@@ -151,6 +151,21 @@
   .diff-line-code { padding: 2px 16px; }
   .diff-gap { height: 8px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface); }
 
+  .file-viewer { max-height: 500px; overflow-y: auto; }
+  .cov-line { display: flex; font-family: var(--mono); font-size: 12px; line-height: 1.8; border-bottom: 1px solid var(--border-subtle); }
+  .cov-line-num { width: 44px; text-align: right; padding: 1px 8px 1px 0; flex-shrink: 0; user-select: none; }
+  .cov-line-hits { width: 36px; text-align: right; padding: 1px 8px 1px 0; flex-shrink: 0; color: var(--text-muted); font-size: 10px; }
+  .cov-line-code { padding: 1px 16px; white-space: pre; overflow-x: auto; flex: 1; }
+  .cov-line-covered { background: rgba(34, 197, 94, 0.04); }
+  .cov-line-covered .cov-line-num { color: var(--text-muted); border-right: 3px solid rgba(34, 197, 94, 0.3); }
+  .cov-line-covered .cov-line-hits { color: var(--green); }
+  .cov-line-uncovered { background: rgba(239, 68, 68, 0.06); }
+  .cov-line-uncovered .cov-line-num { color: var(--red); border-right: 3px solid var(--red); font-weight: 600; }
+  .cov-line-uncovered .cov-line-hits { color: var(--red); font-weight: 600; }
+  .cov-line-none .cov-line-num { color: var(--text-muted); border-right: 3px solid transparent; }
+  .cov-file-row { cursor: pointer; }
+  .cov-file-detail td { padding: 0 !important; }
+
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -222,12 +237,13 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
-// Table sorting
+// Table sorting (skips detail rows)
 document.querySelectorAll('th[data-sort]').forEach(th => {
   th.addEventListener('click', function() {
     const table = this.closest('table');
     const tbody = table.querySelector('tbody');
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    // Only sort primary rows, not detail/expand rows
+    const rows = Array.from(tbody.querySelectorAll('tr:not(.cov-file-detail)'));
     const idx = Array.from(this.parentNode.children).indexOf(this);
     const asc = !this.classList.contains('sorted-asc');
     this.parentNode.querySelectorAll('th').forEach(h => h.classList.remove('sorted', 'sorted-asc', 'sorted-desc'));
@@ -240,7 +256,12 @@ document.querySelectorAll('th[data-sort]').forEach(th => {
       if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
       return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
-    rows.forEach(row => tbody.appendChild(row));
+    // Re-append each row followed by its detail row
+    rows.forEach(row => {
+      tbody.appendChild(row);
+      const detail = row.nextElementSibling;
+      if (detail?.classList.contains('cov-file-detail')) tbody.appendChild(detail);
+    });
   });
 });
 
@@ -267,6 +288,17 @@ if (hideFullCov) {
     });
   });
 }
+
+// Coverage file expand/collapse
+document.querySelectorAll('.cov-file-row').forEach(row => {
+  row.addEventListener('click', function(e) {
+    if (e.target.closest('a')) return; // don't toggle when clicking links
+    const detail = this.nextElementSibling;
+    if (detail?.classList.contains('cov-file-detail')) {
+      detail.style.display = detail.style.display === 'none' ? '' : 'none';
+    }
+  });
+});
 
 // Diff file expand/collapse
 document.querySelectorAll('.diff-file-toggle').forEach(toggle => {
