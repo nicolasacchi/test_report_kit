@@ -330,6 +330,8 @@ module TestReportKit
         require 'simplecov'
         require 'simplecov-json'
 
+        SimpleCov.command_name "RSpec-\#{ENV['TEST_ENV_NUMBER'] || 0}" if ENV['TEST_ENV_NUMBER']
+
         SimpleCov.start 'rails' do
           enable_coverage :branch
 

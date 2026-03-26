@@ -6,7 +6,7 @@ module TestReportKit
   class DataLoader
     attr_reader :simplecov_data, :rspec_data, :factory_prof_data,
                 :event_prof_data, :rspec_dissect_data, :git_churn_data,
-                :resource_usage_data
+                :resource_usage_data, :parallel_info_data
 
     def initialize(config: TestReportKit.configuration)
       @config = config
@@ -20,6 +20,7 @@ module TestReportKit
       @rspec_dissect_data = load_json(rspec_dissect_path)
       @git_churn_data    = load_json(git_churn_path)
       @resource_usage_data = load_json(resource_usage_path)
+      @parallel_info_data  = load_json(parallel_info_path)
       self
     end
 
@@ -120,6 +121,10 @@ module TestReportKit
 
     def resource_usage_path
       File.join(@config.output_dir, "resource_usage.json")
+    end
+
+    def parallel_info_path
+      File.join(@config.output_dir, "parallel_info.json")
     end
   end
 end

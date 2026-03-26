@@ -209,6 +209,9 @@
     <div class="tab" data-tab="performance">Performance</div>
     <div class="tab" data-tab="factories">Factory Health</div>
     <div class="tab" data-tab="insights">Insights</div>
+    <% if parallel_info -%>
+    <div class="tab" data-tab="parallel">Parallel <span style="font-family: var(--mono); font-size: 11px; background: var(--accent-glow); color: var(--accent); padding: 1px 6px; border-radius: 4px; margin-left: 4px;"><%= parallel_info["node_count"] %></span></div>
+    <% end -%>
   </div>
 
   <!-- TAB CONTENT -->
@@ -232,6 +235,11 @@
   <div class="tab-content" id="tab-insights">
     <%= render_partial("tab_insights") %>
   </div>
+  <% if parallel_info -%>
+  <div class="tab-content" id="tab-parallel">
+    <%= render_partial("tab_parallel") %>
+  </div>
+  <% end -%>
 
 </div>
 

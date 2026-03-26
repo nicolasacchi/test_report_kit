@@ -22,4 +22,25 @@ namespace :test_report do
   task generate: :environment do
     TestReportKit.run!(mode: :generate)
   end
+
+  desc "Merge parallel test artifacts and generate report. Usage: rake test_report:merge[pattern]"
+  task :merge, [:pattern] => :environment do |_t, args|
+    require "test_report_kit/parallel_merger"
+
+    pattern = args[:pattern] || "test-results-*"
+    dirs = Dir.glob(pattern).select { |f| File.directory?(f) }
+
+    if dirs.empty?
+      puts "TestReportKit: No artifact directories found matching '#{pattern}'"
+      exit 1
+    end
+
+    puts "TestReportKit: Merging #{dirs.size} parallel nodes: #{dirs.join(', ')}"
+    TestReportKit::ParallelMerger.new(
+      artifact_dirs: dirs,
+      config: TestReportKit.configuration
+    ).merge!
+
+    TestReportKit.run!(mode: :generate)
+  end
 end

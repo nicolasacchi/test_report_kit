@@ -184,6 +184,22 @@ module TestReportKit
       @data_loader.respond_to?(:resource_usage_data) ? @data_loader.resource_usage_data : nil
     end
 
+    def parallel_info
+      @data_loader.respond_to?(:parallel_info_data) ? @data_loader.parallel_info_data : nil
+    end
+
+    def format_duration_val(seconds)
+      return "—" unless seconds
+      s = seconds.to_f
+      if s >= 60
+        "#{(s / 60).floor}m #{(s % 60).round(0)}s"
+      elsif s >= 1
+        "#{s.round(1)}s"
+      else
+        "#{(s * 1000).round(0)}ms"
+      end
+    end
+
     def format_number(n)
       return "—" unless n
       n.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse
