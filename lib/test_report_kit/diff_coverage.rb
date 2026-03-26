@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "set"
+
 module TestReportKit
   class DiffCoverage
     HUNK_HEADER_RE = /^@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,(\d+))?\s+@@/
@@ -127,25 +129,27 @@ module TestReportKit
 
       source_lines = File.readlines(source_path, chomp: true)
       content = []
+      emitted = Set.new
 
       group_consecutive_lines(uncovered).each_with_index do |group, idx|
         content << { type: :gap } if idx > 0
 
-        # 1 context line before
+        # 1 context line before (skip if already emitted)
         ctx_before = group.first - 1
-        if ctx_before >= 1 && ctx_before <= source_lines.size && !uncovered.include?(ctx_before)
+        if ctx_before >= 1 && ctx_before <= source_lines.size && !uncovered.include?(ctx_before) && emitted.add?(ctx_before)
           content << { type: :context, line: ctx_before, content: source_lines[ctx_before - 1] }
         end
 
         # Uncovered lines
         group.each do |line_num|
           next if line_num < 1 || line_num > source_lines.size
+          emitted.add(line_num)
           content << { type: :uncovered, line: line_num, content: source_lines[line_num - 1] }
         end
 
-        # 1 context line after
+        # 1 context line after (skip if already emitted)
         ctx_after = group.last + 1
-        if ctx_after >= 1 && ctx_after <= source_lines.size && !uncovered.include?(ctx_after)
+        if ctx_after >= 1 && ctx_after <= source_lines.size && !uncovered.include?(ctx_after) && emitted.add?(ctx_after)
           content << { type: :context, line: ctx_after, content: source_lines[ctx_after - 1] }
         end
       end

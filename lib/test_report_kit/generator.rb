@@ -3,6 +3,7 @@
 require "erb"
 require "json"
 require "fileutils"
+require "strscan"
 
 module TestReportKit
   class Generator
@@ -141,13 +142,26 @@ module TestReportKit
     end
 
     def highlight_ruby(code)
-      code = h(code).dup
-      code.gsub!(/\b(def|end|if|else|elsif|unless|do|class|module|raise|return|next|begin|rescue|ensure|yield|nil|true|false|self)\b/, '<span style="color: #c678dd;">\1</span>')
-      code.gsub!(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;)/, '<span style="color: #98c379;">\1</span>')
-      code.gsub!(/(:[a-zA-Z_]\w*)/, '<span style="color: #98c379;">\1</span>')
-      code.gsub!(/\b([A-Z][a-zA-Z0-9]*(?:::[A-Z][a-zA-Z0-9]*)*)\b/, '<span style="color: var(--cyan);">\1</span>')
-      code.gsub!(/(#.*)$/, '<span style="color: var(--text-muted);">\1</span>')
-      code
+      return "" if code.nil? || code.empty?
+
+      result = +""
+      scanner = StringScanner.new(code)
+      until scanner.eos?
+        if scanner.scan(/#.*$/)
+          result << %(<span style="color: var(--text-muted);">#{h(scanner.matched)}</span>)
+        elsif scanner.scan(/"[^"]*"|'[^']*'/)
+          result << %(<span style="color: #98c379;">#{h(scanner.matched)}</span>)
+        elsif scanner.scan(/:[a-zA-Z_]\w*/)
+          result << %(<span style="color: #98c379;">#{h(scanner.matched)}</span>)
+        elsif scanner.scan(/\b(?:def|end|if|else|elsif|unless|do|class|module|raise|return|next|begin|rescue|ensure|yield|nil|true|false|self)\b/)
+          result << %(<span style="color: #c678dd;">#{h(scanner.matched)}</span>)
+        elsif scanner.scan(/\b[A-Z][a-zA-Z0-9]*(?:::[A-Z][a-zA-Z0-9]*)*\b/)
+          result << %(<span style="color: var(--cyan);">#{h(scanner.matched)}</span>)
+        else
+          result << h(scanner.scan(/./m))
+        end
+      end
+      result
     end
 
     def build_file_line_data(relative_path)

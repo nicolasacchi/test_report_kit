@@ -18,7 +18,7 @@
       <% slowest_tests.each do |t| -%>
       <tr>
         <td style="color: var(--text-primary); max-width: 400px;"><%= h(t[:description]) %></td>
-        <td><span class="file-path"><% parts = t[:file].to_s.split(':'); %><%= file_link(parts[0], line: parts[1]&.to_i) %><%= parts[1] ? ":#{parts[1]}" : "" %></span></td>
+        <td><span class="file-path"><% parts = t[:file].to_s.sub(%r{^\./}, '').split(':'); %><%= file_link(parts[0], line: parts[1]&.to_i) %><%= parts[1] ? ":#{parts[1]}" : "" %></span></td>
         <td><span class="num" style="color: <%= t[:slow] ? 'var(--red)' : 'var(--yellow)' %>; font-weight: 700;"><%= t[:duration] %>s</span></td>
         <td><span class="badge badge-<%= t[:status] == 'passed' ? 'pass' : 'fail' %>"><%= t[:status] == 'passed' ? 'pass' : t[:status] %></span></td>
       </tr>
