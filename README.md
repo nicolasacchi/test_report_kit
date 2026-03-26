@@ -2,9 +2,11 @@
 
 RSpec coverage + profiling HTML dashboard. Reads SimpleCov and test-prof output files, generates a single self-contained HTML report.
 
-**Live demos:** [passing](https://nicolasacchi.github.io/test_report_kit_demo/main/) | [diff coverage](https://nicolasacchi.github.io/test_report_kit_demo/feature-add-services/) | [failures](https://nicolasacchi.github.io/test_report_kit_demo/feature-failing-tests/)
+**Live demos:** [passing](https://nicolasacchi.github.io/test_report_kit_demo/main/) | [diff coverage](https://nicolasacchi.github.io/test_report_kit_demo/feature-add-services/) | [failures](https://nicolasacchi.github.io/test_report_kit_demo/feature-failing-tests/) | [parallel](https://nicolasacchi.github.io/test_report_kit_demo/feature-parallel-tests/)
 
 ## Setup
+
+### From GitHub
 
 ```ruby
 # Gemfile
@@ -16,6 +18,22 @@ group :test do
 end
 ```
 
+### From local path
+
+If you have the gem checked out locally (e.g. at `~/projects/test_report_kit`):
+
+```ruby
+# Gemfile
+group :test do
+  gem "test_report_kit", path: "~/projects/test_report_kit"
+  gem "simplecov", require: false
+  gem "simplecov-json", require: false
+  gem "test-prof", "~> 1.0"
+end
+```
+
+### Configure
+
 ```ruby
 # config/initializers/test_report_kit.rb
 if Rails.env.test?
@@ -26,12 +44,21 @@ if Rails.env.test?
 end
 ```
 
+### Run
+
 ```bash
 bundle exec rake test_report:full
 open tmp/test_report/index.html
 ```
 
 Auto-integrates via Railtie. No manual require needed.
+
+For non-Rails projects, add to your Rakefile:
+
+```ruby
+require "test_report_kit"
+load "tasks/test_report_kit.rake"
+```
 
 ## Rake Tasks
 
@@ -74,12 +101,19 @@ Auto-integrates via Railtie. No manual require needed.
 
 ## Output Files
 
+All written to `output_dir` (default `tmp/test_report/`):
+
 | File | Purpose |
 |------|---------|
-| `index.html` | Dashboard (self-contained) |
+| `index.html` | Dashboard (self-contained, open in browser) |
 | `summary.json` | CI consumption (PR comments, threshold gates) |
-| `report.md` | Markdown report (for AI/code review tools) |
-| `resource_usage.json` | Peak memory, CPU time |
+| `report.md` | Markdown report with action items (for AI/code review tools) |
+| `resource_usage.json` | Peak memory (MB), CPU time (user/system seconds) |
+| `rspec_results.json` | Raw RSpec JSON output |
+| `factory_prof.json` | FactoryProf data |
+| `event_prof.json` | EventProf data |
+| `rspec_dissect.json` | RSpecDissect data |
+| `git_churn.json` | Per-file commit counts (last N days) |
 
 ## CI Example
 
@@ -122,9 +156,7 @@ jobs:
       - run: bundle exec rake "test_report:merge[artifacts/test-results-*]"
 ```
 
-The merge task combines coverage, RSpec results, profiler data, and resource metrics from all nodes. The Parallel tab shows per-node breakdown and balance analysis.
-
-See [parallel demo](https://nicolasacchi.github.io/test_report_kit_demo/feature-parallel-tests/) for a live example.
+See [parallel demo](https://nicolasacchi.github.io/test_report_kit_demo/feature-parallel-tests/).
 
 ## Architecture
 
@@ -143,8 +175,10 @@ Runner → shells out to rspec with ENV vars (FPROF, EVENT_PROF, RD_PROF)
 ## Development
 
 ```bash
+git clone https://github.com/nicolasacchi/test_report_kit.git
+cd test_report_kit
 docker compose build
-docker compose run --rm gem bundle exec rspec   # 81 specs
+docker compose run --rm gem bundle exec rspec   # 87 specs
 ```
 
 MIT License
