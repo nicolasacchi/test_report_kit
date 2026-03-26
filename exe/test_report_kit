@@ -1,0 +1,90 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "test_report_kit"
+require "test_report_kit/runner"
+require "optparse"
+require "yaml"
+
+module TestReportKit
+  class CLI
+    MODES = %w[full coverage profile generate merge].freeze
+
+    def run(args)
+      mode = args.shift
+      unless mode && MODES.include?(mode)
+        puts usage
+        exit 1
+      end
+
+      options = parse_options(args)
+      load_config_file(options[:config])
+
+      case mode
+      when "merge"
+        require "test_report_kit/parallel_merger"
+        pattern = args.first || "test-results-*"
+        dirs = Dir.glob(pattern).select { |f| File.directory?(f) }
+        if dirs.empty?
+          warn "No artifact directories found matching '#{pattern}'"
+          exit 1
+        end
+        ParallelMerger.new(artifact_dirs: dirs, config: TestReportKit.configuration).merge!
+        TestReportKit.run!(mode: :generate)
+      else
+        exit_code = TestReportKit.run!(mode: mode.to_sym)
+        exit(exit_code || 0)
+      end
+    end
+
+    private
+
+    def parse_options(args)
+      options = {}
+      OptionParser.new do |opts|
+        opts.banner = "Usage: test_report_kit <mode> [options]"
+        opts.on("-c", "--config FILE", "Config file (.test_report_kit.yml)") { |f| options[:config] = f }
+        opts.on("--output-dir DIR", "Output directory") { |d| TestReportKit.configuration.output_dir = d }
+        opts.on("--github-url URL", "GitHub repo URL") { |u| TestReportKit.configuration.github_url = u }
+        opts.on("--base-branch BRANCH", "Diff coverage base branch") { |b| TestReportKit.configuration.diff_base_branch = b }
+        opts.on("--fail-on-coverage", "Exit 1 if below coverage threshold") { TestReportKit.configuration.fail_on_coverage = true }
+        opts.on("--fail-on-diff-coverage", "Exit 1 if below diff coverage threshold") { TestReportKit.configuration.fail_on_diff_coverage = true }
+      end.parse!(args)
+      options
+    end
+
+    def load_config_file(path = nil)
+      path ||= ".test_report_kit.yml"
+      return unless File.exist?(path)
+
+      config = YAML.safe_load(File.read(path), symbolize_names: true) || {}
+      c = TestReportKit.configuration
+      config.each do |key, value|
+        c.public_send(:"#{key}=", value) if c.respond_to?(:"#{key}=")
+      end
+    end
+
+    def usage
+      <<~USAGE
+        test_report_kit — RSpec coverage + profiling dashboard
+
+        Usage:
+          test_report_kit full                  Run tests with coverage + profiling
+          test_report_kit coverage              Coverage only
+          test_report_kit profile               Profiling only
+          test_report_kit generate              Re-generate from existing JSON
+          test_report_kit merge [pattern]       Merge parallel artifacts
+
+        Options:
+          -c, --config FILE                     Config file (.test_report_kit.yml)
+          --output-dir DIR                      Output directory
+          --github-url URL                      GitHub repo URL for source links
+          --base-branch BRANCH                  Git diff base branch
+          --fail-on-coverage                    Exit 1 if below coverage threshold
+          --fail-on-diff-coverage               Exit 1 if below diff coverage threshold
+      USAGE
+    end
+  end
+end
+
+TestReportKit::CLI.new.run(ARGV)

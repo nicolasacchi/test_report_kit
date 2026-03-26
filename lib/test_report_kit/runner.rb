@@ -8,6 +8,7 @@ require_relative "metrics_calculator"
 require_relative "generator"
 require_relative "summary_exporter"
 require_relative "markdown_exporter"
+require_relative "trend_tracker"
 
 module TestReportKit
   class Runner
@@ -212,6 +213,8 @@ module TestReportKit
       puts "TestReportKit: Dashboard → #{report_path}"
       puts "TestReportKit: Summary  → #{summary_path}"
       puts "TestReportKit: Markdown → #{md_path}"
+
+      TrendTracker.new(config: @config).record(summary_path)
     end
 
     # ── Resource usage ──
