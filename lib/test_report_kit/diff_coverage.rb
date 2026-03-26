@@ -187,14 +187,28 @@ module TestReportKit
     end
 
     def run_git_diff
-      base = @config.diff_base_branch
+      base = resolve_base_ref
+      return nil unless base
+
       cmd = "git diff #{base}...HEAD --unified=0 --no-color --diff-filter=ACMR --find-renames"
       result = `#{cmd} 2>/dev/null`
       $?.success? ? result : nil
     end
 
-    def git_merge_base
+    def resolve_base_ref
       base = @config.diff_base_branch
+      ["git rev-parse --verify #{base} 2>/dev/null", "git rev-parse --verify origin/#{base} 2>/dev/null"].each do |cmd|
+        result = `#{cmd}`.strip
+        return result[0..11] if $?.success? && !result.empty?
+      end
+      nil
+    rescue Errno::ENOENT
+      nil
+    end
+
+    def git_merge_base
+      base = resolve_base_ref
+      return "" unless base
       `git merge-base #{base} HEAD 2>/dev/null`.strip[0..6]
     end
 

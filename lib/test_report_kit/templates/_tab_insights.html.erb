@@ -105,10 +105,10 @@
   <div class="insight-header">
     <div class="insight-icon" style="background: var(--red-dim); color: var(--red);">&#9888;&#65039;</div>
     <div class="insight-title">Untested Hot Paths</div>
-    <div class="insight-count">active development + zero coverage</div>
+    <div class="insight-count">active development + low coverage</div>
   </div>
   <% if insights[:untested_hot_paths]&.any? -%>
-  <div class="section-desc" style="padding: 12px 20px 0;">files with &gt;10 commits in 90 days and 0% test coverage. these are being actively worked on with no safety net.</div>
+  <div class="section-desc" style="padding: 12px 20px 0;">files with &gt;10 commits in 90 days and &lt;40% test coverage. these are being actively worked on with insufficient testing.</div>
   <table>
     <thead>
       <tr>

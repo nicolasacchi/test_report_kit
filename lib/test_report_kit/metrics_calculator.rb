@@ -266,7 +266,7 @@ module TestReportKit
 
       churn_files.filter_map do |path, commits|
         cov = coverage_map[path]
-        next unless commits > 10 && (cov.nil? || cov == 0.0)
+        next unless commits > 10 && (cov.nil? || cov < 40)
 
         { path: path, churn: commits, coverage_pct: cov || 0.0 }
       end.sort_by { |f| -f[:churn] }
