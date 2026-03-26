@@ -28,10 +28,11 @@ module TestReportKit
 
     private
 
-    def collect(filename, subdir: nil)
+    def collect(filename, subdirs: nil)
+      search_dirs = subdirs || ["", "tmp/test_report"]
       @dirs.filter_map do |dir|
-        path = subdir ? File.join(dir, subdir, filename) : File.join(dir, filename)
-        File.exist?(path) ? path : nil
+        found = search_dirs.map { |sub| File.join(dir, sub, filename) }.find { |p| File.exist?(p) }
+        found
       end
     end
 
@@ -42,7 +43,7 @@ module TestReportKit
     # ── SimpleCov ──
 
     def merge_simplecov
-      files = collect(".resultset.json", subdir: "coverage")
+      files = collect(".resultset.json", subdirs: ["coverage"])
       return if files.empty?
 
       merged = {}
@@ -65,8 +66,6 @@ module TestReportKit
 
     def merge_rspec_results
       files = collect("rspec_results.json")
-      # Also check inside tmp/test_report/ subdirectory
-      files = collect("rspec_results.json", subdir: "tmp/test_report") if files.empty?
       return if files.empty?
 
       all_examples = []
@@ -104,7 +103,7 @@ module TestReportKit
     # ── FactoryProf ──
 
     def merge_factory_prof
-      files = collect("factory_prof.json") + collect("factory_prof.json", subdir: "tmp/test_report")
+      files = collect("factory_prof.json") + collect("test-prof.result.json", subdirs: ["tmp/test_prof"])
       return if files.empty?
 
       total_count = total_top_level = 0
@@ -138,7 +137,7 @@ module TestReportKit
     # ── EventProf ──
 
     def merge_event_prof
-      files = collect("event_prof.json") + collect("event_prof.json", subdir: "tmp/test_report")
+      files = collect("event_prof.json")
       return if files.empty?
 
       total_events = 0
@@ -172,7 +171,7 @@ module TestReportKit
     # ── RSpecDissect ──
 
     def merge_rspec_dissect
-      files = collect("rspec_dissect.json") + collect("rspec_dissect.json", subdir: "tmp/test_report")
+      files = collect("rspec_dissect.json")
       return if files.empty?
 
       suites_by_loc = {}
@@ -191,7 +190,7 @@ module TestReportKit
     # ── Resource Usage ──
 
     def merge_resource_usage
-      files = collect("resource_usage.json") + collect("resource_usage.json", subdir: "tmp/test_report")
+      files = collect("resource_usage.json")
       return if files.empty?
 
       max_mem = 0
@@ -271,7 +270,7 @@ module TestReportKit
     # ── Helpers ──
 
     def copy_first(filename)
-      files = collect(filename) + collect(filename, subdir: "tmp/test_report")
+      files = collect(filename)
       return if files.empty?
       FileUtils.cp(files.first, File.join(@config.output_dir, filename))
     end

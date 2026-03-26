@@ -102,6 +102,7 @@ module TestReportKit
       output_log = File.join(@config.output_dir, "test_output.log")
 
       cmd_parts = ["bundle", "exec", "rspec"]
+      cmd_parts += ENV["TEST_REPORT_SPECS"].split if ENV["TEST_REPORT_SPECS"]
       cmd_parts += ["--require", @simplecov_init_path] if coverage && @simplecov_init_path
       cmd_parts += ["--format", "json", "--out", rspec_json_path]
       cmd_parts += ["--format", "progress"]
