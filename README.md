@@ -41,6 +41,7 @@ Auto-integrates via Railtie. No manual require needed.
 | `test_report:coverage` | Coverage only (no profiling) |
 | `test_report:profile` | Profiling only (no coverage) |
 | `test_report:generate` | Re-generate from existing JSON (no test run) |
+| `test_report:merge[pattern]` | Merge parallel CI artifacts and generate report |
 
 ## Dashboard Tabs
 
@@ -52,6 +53,7 @@ Auto-integrates via Railtie. No manual require needed.
 | Performance | Time distribution, file grouping, slowest tests, RSpecDissect, EventProf |
 | Factory Health | FactoryBot usage, cascade analysis, optimization suggestions |
 | Insights | High-risk files, over-tested, false security, untested hot paths |
+| Parallel | Per-node stats, efficiency %, duration balance (conditional, after merge) |
 
 ## Configuration
 
@@ -67,6 +69,8 @@ Auto-integrates via Railtie. No manual require needed.
 | `github_url` | `nil` | Enables source links |
 | `event_prof_event` | `factory.create` | EventProf event |
 | `profilers` | `[:factory_prof, :rspec_dissect, :event_prof]` | Enabled profilers |
+| `fail_on_coverage` | `false` | Exit 1 if below `coverage_threshold` |
+| `fail_on_diff_coverage` | `false` | Exit 1 if below `diff_coverage_threshold` |
 
 ## Output Files
 

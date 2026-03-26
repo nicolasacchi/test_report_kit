@@ -13,7 +13,9 @@ module TestReportKit
                   :factory_cascade_threshold,
                   :project_root,
                   :github_url,
-                  :event_prof_event
+                  :event_prof_event,
+                  :fail_on_coverage,
+                  :fail_on_diff_coverage
 
     def initialize
       @project_name             = nil
@@ -28,6 +30,8 @@ module TestReportKit
       @project_root             = Dir.pwd
       @github_url               = nil
       @event_prof_event         = "factory.create"
+      @fail_on_coverage         = false
+      @fail_on_diff_coverage    = false
     end
 
     def resolved_project_name

@@ -59,6 +59,7 @@ lib/
     generator.rb                  # ERB renderer + all template helpers
     summary_exporter.rb           # summary.json writer (with delta from previous run)
     markdown_exporter.rb          # report.md writer (for Claude Code/AI consumption)
+    parallel_merger.rb            # Merges artifacts from parallel CI nodes
     templates/
       dashboard.html.erb          # Main HTML shell: head, CSS, tabs, JS
       _summary_cards.html.erb     # 5 summary cards + resource stats bar
@@ -68,8 +69,9 @@ lib/
       _tab_performance.html.erb   # Time dist, file grouping, slowest tests, RSpecDissect, EventProf
       _tab_factories.html.erb     # Factory ranking + expandable details + suggestions
       _tab_insights.html.erb      # High-risk, over-tested, false security, untested hot paths
+      _tab_parallel.html.erb      # Parallel runs: per-node stats, balance (conditional)
   tasks/
-    test_report_kit.rake          # Rake task definitions (full, coverage, profile, generate)
+    test_report_kit.rake          # Rake task definitions (full, coverage, profile, generate, merge)
 spec/
   fixtures/                       # Sample JSON files for testing
   test_report_kit/                # Per-class specs
@@ -91,6 +93,8 @@ TestReportKit.configure do |config|
   config.github_url               = "https://github.com/org/repo"  # Enables source links
   config.event_prof_event         = "factory.create"   # EventProf event to track
   config.profilers                = %i[factory_prof rspec_dissect event_prof]  # Which profilers
+  config.fail_on_coverage         = false              # Exit 1 if below coverage_threshold
+  config.fail_on_diff_coverage    = false              # Exit 1 if below diff_coverage_threshold
 end
 ```
 
@@ -108,8 +112,10 @@ Key methods available in templates (via `generator.rb`):
 | `build_test_source(file, line)` | Extract test block source with smart `end` detection |
 | `build_file_line_data(path)` | Per-line coverage data for inline file viewer |
 | `coverage_color(pct)` | Returns CSS color var for coverage percentage |
-| `risk_color(score)` / `risk_bg(score)` | Color for risk score badges |
+| `risk_color(score)` / `risk_bg(score)` | Color for risk score badges. Risk = `churn * (100 - coverage_pct)`. Green <200, yellow <500, red >=500 |
+| `severity_color(severity)` | Color for suggestion severity (critical/high/medium) |
 | `format_number(n)` | Number with comma separators |
+| `format_duration_val(seconds)` | Smart duration: 42ms / 1.2s / 2m 30s |
 
 ## Dashboard Tabs
 
@@ -150,6 +156,19 @@ Key methods available in templates (via `generator.rb`):
 - Over-Tested Files: coverage > 90% AND test time > 10s
 - False Security: >70% of test time in hooks
 - Untested Hot Paths: churn > 10 AND coverage < 40%
+
+### 7. Parallel (`_tab_parallel.html.erb`) — conditional
+- Only appears when `parallel_info.json` exists (after `test_report:merge`)
+- Node count, wall clock vs CPU time, parallelization efficiency %
+- Per-node table: examples, duration, failures, slowest test
+- Duration balance bar chart
+- Balance suggestions (flags nodes >20% off average)
+
+## Key Metrics
+
+- **Risk score** = `churn * (100 - coverage_pct)`. Higher = worse. Color: green <200, yellow <500, red >=500.
+- **Coverage delta** = difference from `previous_summary.json` (saved automatically between runs).
+- **Resource usage** = peak RSS memory (via `/proc/self/status` or `ps`), CPU time via `Process.times`.
 
 ## Conventions
 

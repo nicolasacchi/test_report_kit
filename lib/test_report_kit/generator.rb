@@ -176,7 +176,14 @@ module TestReportKit
     end
 
     def factory_file_link(name)
-      plural = name.to_s.end_with?("y") ? name.to_s.sub(/y$/, "ies") : "#{name}s"
+      n = name.to_s
+      plural = if n.end_with?("y") && !n.end_with?("ey", "ay", "oy", "uy")
+                 n.sub(/y$/, "ies")
+               elsif n.end_with?("s", "x", "ch", "sh")
+                 "#{n}es"
+               else
+                 "#{n}s"
+               end
       gh_link("spec/factories/#{plural}.rb")
     end
 

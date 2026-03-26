@@ -39,6 +39,31 @@ module TestReportKit
       rspec_exit = run_rspec(profiling: profiling, coverage: coverage)
       compute_git_churn
       generate_report
+      check_thresholds(rspec_exit)
+    end
+
+    def check_thresholds(rspec_exit)
+      return rspec_exit unless rspec_exit == 0
+
+      summary_path = File.join(@config.output_dir, "summary.json")
+      return rspec_exit unless File.exist?(summary_path)
+
+      summary = JSON.parse(File.read(summary_path))
+
+      if @config.fail_on_coverage && summary["coverage_pct"]
+        if summary["coverage_pct"] < @config.coverage_threshold
+          warn "TestReportKit: Coverage #{summary['coverage_pct']}% is below threshold #{@config.coverage_threshold}%"
+          return 1
+        end
+      end
+
+      if @config.fail_on_diff_coverage && summary["diff_coverage_passed"] == false
+        warn "TestReportKit: Diff coverage #{summary['diff_coverage_pct']}% is below threshold #{summary['diff_coverage_threshold']}%"
+        return 1
+      end
+
+      rspec_exit
+    rescue JSON::ParserError
       rspec_exit
     end
 
