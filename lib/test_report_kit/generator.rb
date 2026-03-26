@@ -124,6 +124,13 @@ module TestReportKit
       end
     end
 
+    def file_link(path, line: nil)
+      return h(path) unless @config.github_url
+      url = "#{@config.github_url}/blob/#{sha}/#{path}"
+      url += "#L#{line}" if line
+      %(<a href="#{h(url)}" target="_blank" rel="noopener" style="color: inherit; text-decoration: none; border-bottom: 1px dashed var(--border);">#{h(path)}</a>)
+    end
+
     def format_number(n)
       return "—" unless n
       n.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse

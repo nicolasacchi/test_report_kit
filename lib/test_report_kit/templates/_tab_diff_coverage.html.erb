@@ -41,7 +41,7 @@
     <tbody>
       <% diff_cov.files.each do |f| -%>
       <tr>
-        <td><span class="file-path"><%= h(f.path) %></span></td>
+        <td><span class="file-path"><%= file_link(f.path) %></span></td>
         <td>
           <div class="cov-bar">
             <div class="cov-bar-track"><div class="cov-bar-fill" style="width:<%= f.diff_coverage_pct || 0 %>%; background: <%= coverage_color(f.diff_coverage_pct) %>;"></div></div>

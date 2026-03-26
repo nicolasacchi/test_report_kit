@@ -103,7 +103,7 @@ module TestReportKit
         env["FPROF"] = "json"
       end
       if profiling && @config.profilers.include?(:event_prof)
-        env["EVENT_PROF"] = "sql.active_record"
+        env["EVENT_PROF"] = @config.event_prof_event
       end
       if profiling && @config.profilers.include?(:rspec_dissect)
         env["RD_PROF"] = "1"
@@ -122,8 +122,12 @@ module TestReportKit
       Process.wait(pid)
       rspec_exit = $?.exitstatus
 
-      # Split captured output for text-based profilers
-      split_profiler_output(output_log) if profiling
+      if profiling
+        split_profiler_output(output_log)
+        locate_and_copy_factory_prof
+        parse_event_prof_text(File.join(@config.output_dir, "event_prof_output.txt"))
+        parse_rspec_dissect_text(File.join(@config.output_dir, "rspec_dissect_output.txt"))
+      end
 
       puts "TestReportKit: RSpec finished with exit code #{rspec_exit}"
       rspec_exit
@@ -153,6 +157,7 @@ module TestReportKit
       require_relative "metrics_calculator"
       require_relative "generator"
       require_relative "summary_exporter"
+      require_relative "markdown_exporter"
 
       loader = DataLoader.new(config: @config).load_all
 
@@ -186,8 +191,15 @@ module TestReportKit
         config: @config
       ).export
 
+      md_path = MarkdownExporter.new(
+        metrics: metrics,
+        diff_coverage: diff_coverage,
+        config: @config
+      ).export
+
       puts "TestReportKit: Dashboard → #{report_path}"
       puts "TestReportKit: Summary  → #{summary_path}"
+      puts "TestReportKit: Markdown → #{md_path}"
     end
 
     # ── Helpers ──
@@ -206,6 +218,95 @@ module TestReportKit
       if (match = content.match(/RSpecDissect report.+?(?=\n\n[A-Z]|\n\nFinished|\z)/m))
         File.write(File.join(@config.output_dir, "rspec_dissect_output.txt"), match[0])
       end
+    end
+
+    def locate_and_copy_factory_prof
+      glob = File.join(@config.project_root, "tmp", "test_prof", "test-prof.result*.json")
+      source = Dir.glob(glob).max_by { |f| File.mtime(f) }
+      return unless source
+
+      dest = File.join(@config.output_dir, "factory_prof.json")
+      FileUtils.cp(source, dest)
+      puts "TestReportKit: Copied FactoryProf → #{dest}"
+    end
+
+    def parse_event_prof_text(text_path)
+      return unless text_path && File.exist?(text_path)
+
+      content = strip_ansi(File.read(text_path))
+      event_match = content.match(/EventProf results for (.+)/)
+      total_match = content.match(/Total time: ([\d:.]+) of ([\d:.]+) \(([\d.]+)%\)/)
+      events_match = content.match(/Total events: (\d+)/)
+      return unless event_match
+
+      suites = []
+      # Handle both en-dash and hyphen: description (location) – time (count / examples) of run_time (pct%)
+      content.scan(/^(.+?) \((.+?)\) [\u2013\-] ([\d:.]+) \((\d+) \/ (\d+)\) of ([\d:.]+) \(([\d.]+)%\)/m) do
+        suites << {
+          "description" => $1.strip, "location" => $2, "time" => $3,
+          "event_count" => $4.to_i, "example_count" => $5.to_i,
+          "run_time" => $6, "percentage" => $7.to_f
+        }
+      end
+
+      result = {
+        "event" => event_match[1].strip,
+        "total_time" => total_match&.[](1), "total_run_time" => total_match&.[](2),
+        "total_percentage" => total_match&.[](3)&.to_f, "total_events" => events_match&.[](1)&.to_i || 0,
+        "suites" => suites
+      }
+
+      json_path = File.join(@config.output_dir, "event_prof.json")
+      File.write(json_path, JSON.pretty_generate(result))
+      puts "TestReportKit: Parsed EventProf → #{json_path}"
+    end
+
+    def parse_rspec_dissect_text(text_path)
+      return unless text_path && File.exist?(text_path)
+
+      content = strip_ansi(File.read(text_path))
+      total_match = content.match(/Total time: ([\d:.]+)/)
+
+      suites = []
+      # Pattern: description (location) – setup_time (pct%) of total_time (count)
+      content.scan(/^(.+?) \((.+?)\) [\u2013\-] ([\d:.]+) \(([\d.]+)%\) of ([\d:.]+) \((\d+)\)/m) do
+        total_secs = parse_duration($5)
+        before_pct = $4.to_f
+        before_secs = total_secs * before_pct / 100
+        example_secs = total_secs - before_secs
+
+        suites << {
+          "description" => $1.strip, "location" => $2,
+          "total_time" => $5, "example_count" => $6.to_i,
+          "before_time" => format_duration_short(before_secs),
+          "let_time" => "00:00.000",
+          "example_time" => format_duration_short(example_secs),
+          "before_pct" => before_pct.round(1),
+          "let_pct" => 0.0,
+          "example_pct" => (100 - before_pct).round(1)
+        }
+      end
+
+      result = { "total_time" => total_match&.[](1), "suites" => suites }
+      json_path = File.join(@config.output_dir, "rspec_dissect.json")
+      File.write(json_path, JSON.pretty_generate(result))
+      puts "TestReportKit: Parsed RSpecDissect → #{json_path}"
+    end
+
+    def strip_ansi(text)
+      text.gsub(/\e\[\d+(?:;\d+)*m/, "")
+    end
+
+    def parse_duration(str)
+      return 0.0 unless str
+      parts = str.split(":")
+      parts[-2].to_f * 60 + parts[-1].to_f
+    end
+
+    def format_duration_short(seconds)
+      mins = (seconds / 60).floor
+      secs = seconds % 60
+      format("%02d:%06.3f", mins, secs)
     end
 
     def simplecov_init_content

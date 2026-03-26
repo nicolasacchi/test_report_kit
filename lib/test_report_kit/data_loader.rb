@@ -91,9 +91,15 @@ module TestReportKit
     def factory_prof_path
       candidates = [
         File.join(@config.output_dir, "factory_prof.json"),
-        File.join(@config.project_root, "tmp", "test_prof", "factory_prof.json")
+        File.join(@config.project_root, "tmp", "test_prof", "factory_prof.json"),
+        File.join(@config.project_root, "tmp", "test_prof", "test-prof.result.json")
       ]
-      candidates.find { |p| File.exist?(p) }
+      found = candidates.find { |p| File.exist?(p) }
+      return found if found
+
+      # Glob for timestamped variants
+      Dir.glob(File.join(@config.project_root, "tmp", "test_prof", "test-prof.result*.json"))
+         .max_by { |f| File.mtime(f) }
     end
 
     def event_prof_path

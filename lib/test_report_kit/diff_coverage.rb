@@ -115,8 +115,56 @@ module TestReportKit
         non_executable_lines: non_executable,
         diff_coverage_pct: pct,
         not_loaded: not_loaded,
-        uncovered_content: []
+        uncovered_content: not_loaded ? [] : build_uncovered_content(relative_path, uncovered)
       )
+    end
+
+    def build_uncovered_content(relative_path, uncovered)
+      return [] if uncovered.empty?
+
+      source_path = File.join(@config.project_root, relative_path)
+      return [] unless File.exist?(source_path)
+
+      source_lines = File.readlines(source_path, chomp: true)
+      content = []
+
+      group_consecutive_lines(uncovered).each_with_index do |group, idx|
+        content << { type: :gap } if idx > 0
+
+        # 1 context line before
+        ctx_before = group.first - 1
+        if ctx_before >= 1 && ctx_before <= source_lines.size && !uncovered.include?(ctx_before)
+          content << { type: :context, line: ctx_before, content: source_lines[ctx_before - 1] }
+        end
+
+        # Uncovered lines
+        group.each do |line_num|
+          next if line_num < 1 || line_num > source_lines.size
+          content << { type: :uncovered, line: line_num, content: source_lines[line_num - 1] }
+        end
+
+        # 1 context line after
+        ctx_after = group.last + 1
+        if ctx_after >= 1 && ctx_after <= source_lines.size && !uncovered.include?(ctx_after)
+          content << { type: :context, line: ctx_after, content: source_lines[ctx_after - 1] }
+        end
+      end
+
+      content
+    end
+
+    def group_consecutive_lines(lines)
+      return [] if lines.empty?
+      sorted = lines.sort
+      groups = [[sorted.first]]
+      sorted[1..].each do |line|
+        if line == groups.last.last + 1
+          groups.last << line
+        else
+          groups << [line]
+        end
+      end
+      groups
     end
 
     def find_coverage(absolute_path)

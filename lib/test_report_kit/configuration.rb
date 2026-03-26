@@ -11,10 +11,12 @@ module TestReportKit
                   :diff_base_branch,
                   :slow_test_threshold,
                   :factory_cascade_threshold,
-                  :project_root
+                  :project_root,
+                  :github_url,
+                  :event_prof_event
 
     def initialize
-      @project_name             = nil # auto-detected from git or directory name
+      @project_name             = nil
       @output_dir               = "tmp/test_report"
       @profilers                = %i[factory_prof rspec_dissect event_prof]
       @churn_days               = 90
@@ -24,6 +26,8 @@ module TestReportKit
       @slow_test_threshold      = 5.0
       @factory_cascade_threshold = 10
       @project_root             = Dir.pwd
+      @github_url               = nil
+      @event_prof_event         = "factory.create"
     end
 
     def resolved_project_name
