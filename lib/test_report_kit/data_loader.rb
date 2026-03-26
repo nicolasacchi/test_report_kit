@@ -5,7 +5,8 @@ require "json"
 module TestReportKit
   class DataLoader
     attr_reader :simplecov_data, :rspec_data, :factory_prof_data,
-                :event_prof_data, :rspec_dissect_data, :git_churn_data
+                :event_prof_data, :rspec_dissect_data, :git_churn_data,
+                :resource_usage_data
 
     def initialize(config: TestReportKit.configuration)
       @config = config
@@ -18,6 +19,7 @@ module TestReportKit
       @event_prof_data   = load_json(event_prof_path)
       @rspec_dissect_data = load_json(rspec_dissect_path)
       @git_churn_data    = load_json(git_churn_path)
+      @resource_usage_data = load_json(resource_usage_path)
       self
     end
 
@@ -120,6 +122,10 @@ module TestReportKit
 
     def git_churn_path
       File.join(@config.output_dir, "git_churn.json")
+    end
+
+    def resource_usage_path
+      File.join(@config.output_dir, "resource_usage.json")
     end
   end
 end

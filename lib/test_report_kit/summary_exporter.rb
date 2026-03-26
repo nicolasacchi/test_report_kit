@@ -65,6 +65,9 @@ module TestReportKit
 
         top_risks: risks.map { |r| { file: r[:path], coverage: r[:coverage_pct], churn: r[:churn] } },
 
+        peak_memory_mb: load_resource_field("peak_memory_mb"),
+        cpu_user_seconds: load_resource_field("cpu_user_seconds"),
+
         generated_at: Time.now.iso8601,
         branch: ENV.fetch("TEST_REPORT_BRANCH", `git rev-parse --abbrev-ref HEAD 2>/dev/null`.strip),
         sha: ENV.fetch("TEST_REPORT_SHA", `git rev-parse --short HEAD 2>/dev/null`.strip)
@@ -77,6 +80,14 @@ module TestReportKit
       @diff_coverage.files
         .select { |f| f.uncovered_lines.any? }
         .map { |f| { file: f.path, diff_coverage_pct: f.diff_coverage_pct, uncovered_count: f.uncovered_lines.size } }
+    end
+
+    def load_resource_field(field)
+      path = File.join(@config.output_dir, "resource_usage.json")
+      return nil unless File.exist?(path)
+      JSON.parse(File.read(path))[field]
+    rescue StandardError
+      nil
     end
 
     def load_previous

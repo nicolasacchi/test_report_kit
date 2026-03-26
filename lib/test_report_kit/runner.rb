@@ -118,9 +118,13 @@ module TestReportKit
       cmd_parts += ["--format", "progress"]
 
       puts "TestReportKit: Running RSpec..."
+      start_cpu = Process.times
       pid = spawn(env, *cmd_parts, out: output_log, err: [:child, :out])
       Process.wait(pid)
       rspec_exit = $?.exitstatus
+      end_cpu = Process.times
+
+      save_resource_usage(start_cpu, end_cpu)
 
       if profiling
         split_profiler_output(output_log)
@@ -200,6 +204,32 @@ module TestReportKit
       puts "TestReportKit: Dashboard → #{report_path}"
       puts "TestReportKit: Summary  → #{summary_path}"
       puts "TestReportKit: Markdown → #{md_path}"
+    end
+
+    # ── Resource usage ──
+
+    def save_resource_usage(start_cpu, end_cpu)
+      usage = {
+        peak_memory_mb: current_rss_mb,
+        cpu_user_seconds: (end_cpu.cutime - start_cpu.cutime + end_cpu.utime - start_cpu.utime).round(1),
+        cpu_system_seconds: (end_cpu.cstime - start_cpu.cstime + end_cpu.stime - start_cpu.stime).round(1)
+      }
+
+      path = File.join(@config.output_dir, "resource_usage.json")
+      File.write(path, JSON.pretty_generate(usage))
+    rescue StandardError
+      nil
+    end
+
+    def current_rss_mb
+      if File.exist?("/proc/self/status")
+        match = File.read("/proc/self/status").match(/VmRSS:\s+(\d+)/)
+        match ? match[1].to_i / 1024 : nil
+      else
+        `ps -o rss= -p #{Process.pid}`.strip.to_i / 1024
+      end
+    rescue StandardError
+      nil
     end
 
     # ── Helpers ──

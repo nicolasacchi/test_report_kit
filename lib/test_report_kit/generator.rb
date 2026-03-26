@@ -156,6 +156,15 @@ module TestReportKit
       "#{h(path)}#{gh_link(path, line: line)}"
     end
 
+    def factory_file_link(name)
+      plural = name.to_s.end_with?("y") ? name.to_s.sub(/y$/, "ies") : "#{name}s"
+      gh_link("spec/factories/#{plural}.rb")
+    end
+
+    def resource_usage
+      @data_loader.respond_to?(:resource_usage_data) ? @data_loader.resource_usage_data : nil
+    end
+
     def format_number(n)
       return "—" unless n
       n.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse

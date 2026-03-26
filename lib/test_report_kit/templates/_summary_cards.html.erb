@@ -68,3 +68,19 @@
     <% end -%>
   </div>
 </div>
+
+<% ru = resource_usage -%>
+<% ep = event_prof_data -%>
+<% if ru || ep -%>
+<div style="display: flex; gap: 24px; margin-bottom: 24px; font-family: var(--mono); font-size: 12px; color: var(--text-muted); padding: 0 4px;">
+  <% if ru && ru["peak_memory_mb"] -%>
+  <span>peak memory <span style="color: var(--text-secondary); font-weight: 600;"><%= ru["peak_memory_mb"] %> MB</span></span>
+  <% end -%>
+  <% if ru && ru["cpu_user_seconds"] -%>
+  <span>cpu <span style="color: var(--text-secondary); font-weight: 600;"><%= ru["cpu_user_seconds"] %>s</span> user / <span style="color: var(--text-secondary); font-weight: 600;"><%= ru["cpu_system_seconds"] %>s</span> sys</span>
+  <% end -%>
+  <% if ep && ep["total_events"] -%>
+  <span><%= h(ep["event"]) %> events <span style="color: var(--text-secondary); font-weight: 600;"><%= format_number(ep["total_events"]) %></span></span>
+  <% end -%>
+</div>
+<% end -%>

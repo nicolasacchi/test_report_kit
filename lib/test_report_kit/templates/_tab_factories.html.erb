@@ -21,7 +21,7 @@
     <tbody>
       <% factory_health[:stats].each do |s| -%>
       <tr class="factory-row" style="cursor: pointer;">
-        <td><span class="num" style="color: var(--cyan); font-weight: 600;">:<%= h(s[:name]) %></span></td>
+        <td><span class="num" style="color: var(--cyan); font-weight: 600;">:<%= h(s[:name]) %></span><%= factory_file_link(s[:name]) %></td>
         <td><span class="num" style="color: <%= s[:total_count] >= 1000 ? 'var(--red)' : s[:total_count] >= 500 ? 'var(--orange)' : 'var(--text-secondary)' %>; font-weight: 700;"><%= format_number(s[:total_count]) %></span></td>
         <td><span class="num"><%= format_number(s[:top_level_count]) %></span></td>
         <td><span class="risk-score" style="background: <%= s[:cascade_ratio] >= 5 ? 'var(--red-dim)' : s[:cascade_ratio] >= 3 ? 'var(--yellow-dim)' : 'var(--green-dim)' %>; color: <%= s[:cascade_ratio] >= 5 ? 'var(--red)' : s[:cascade_ratio] >= 3 ? 'var(--yellow)' : 'var(--green)' %>;"><%= s[:cascade_ratio] %>x</span></td>
