@@ -72,6 +72,24 @@ module TestReportKit
       @metrics[:slowest_tests] || []
     end
 
+    def test_time_distribution
+      @metrics[:test_time_distribution]
+    end
+
+    def time_by_file
+      @metrics[:time_by_file] || []
+    end
+
+    def build_test_source(file_path, line_number, max_lines: 15)
+      path = file_path.to_s.sub(%r{^\./}, "")
+      abs_path = File.join(@config.project_root, path)
+      return nil unless File.exist?(abs_path)
+
+      lines = File.readlines(abs_path, chomp: true)
+      start = [line_number.to_i - 1, 0].max
+      lines[start, max_lines]&.each_with_index&.map { |content, i| { line: start + i + 1, content: content } }
+    end
+
     def factory_health
       @metrics[:factory_health]
     end

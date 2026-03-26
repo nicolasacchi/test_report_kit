@@ -21,6 +21,8 @@ module TestReportKit
         file_coverage: file_coverage_list,
         rspec_summary: rspec_summary,
         slowest_tests: slowest_tests,
+        test_time_distribution: test_time_distribution,
+        time_by_file: time_by_file,
         factory_health: factory_health,
         risk_scores: risk_scores,
         insights: insights
@@ -147,6 +149,54 @@ module TestReportKit
             slow: e["run_time"] >= @config.slow_test_threshold
           }
         end
+    end
+
+    # ── Time distribution ──
+
+    def test_time_distribution
+      return nil unless @rspec && @rspec["examples"]
+
+      buckets = [
+        { label: "<0.01s", min: 0, max: 0.01, count: 0, color: "var(--green)" },
+        { label: "0.01–0.05s", min: 0.01, max: 0.05, count: 0, color: "var(--green)" },
+        { label: "0.05–0.1s", min: 0.05, max: 0.1, count: 0, color: "var(--yellow)" },
+        { label: "0.1–0.5s", min: 0.1, max: 0.5, count: 0, color: "var(--yellow)" },
+        { label: "0.5–1s", min: 0.5, max: 1.0, count: 0, color: "var(--orange)" },
+        { label: ">1s", min: 1.0, max: Float::INFINITY, count: 0, color: "var(--red)" }
+      ]
+
+      @rspec["examples"].each do |e|
+        t = e["run_time"] || 0
+        bucket = buckets.find { |b| t >= b[:min] && t < b[:max] }
+        bucket[:count] += 1 if bucket
+      end
+
+      max_count = buckets.map { |b| b[:count] }.max
+      buckets.each { |b| b[:pct] = max_count > 0 ? (b[:count].to_f / max_count * 100).round(0) : 0 }
+      buckets
+    end
+
+    # ── Time by file ──
+
+    def time_by_file
+      return [] unless @rspec && @rspec["examples"]
+
+      grouped = @rspec["examples"]
+        .select { |e| e["run_time"] && e["status"] != "pending" }
+        .group_by { |e| e["file_path"] }
+
+      grouped.map do |file, examples|
+        total = examples.sum { |e| e["run_time"] || 0 }
+        slowest = examples.max_by { |e| e["run_time"] || 0 }
+        {
+          file: file,
+          total_time: total.round(3),
+          count: examples.size,
+          avg_time: (total / examples.size).round(3),
+          slowest_description: slowest&.dig("full_description"),
+          slowest_duration: slowest&.dig("run_time")&.round(3)
+        }
+      end.sort_by { |f| -f[:total_time] }
     end
 
     # ── Factory health ──

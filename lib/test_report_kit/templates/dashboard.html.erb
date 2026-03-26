@@ -303,6 +303,17 @@ document.querySelectorAll('.cov-file-row').forEach(row => {
   });
 });
 
+// Performance test expand/collapse
+document.querySelectorAll('.perf-test-row').forEach(row => {
+  row.addEventListener('click', function(e) {
+    if (e.target.closest('a')) return;
+    const detail = this.nextElementSibling;
+    if (detail?.classList.contains('perf-test-detail')) {
+      detail.style.display = detail.style.display === 'none' ? '' : 'none';
+    }
+  });
+});
+
 // Diff file expand/collapse
 document.querySelectorAll('.diff-file-toggle').forEach(toggle => {
   toggle.addEventListener('click', function() {
