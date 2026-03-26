@@ -202,6 +202,9 @@
   <!-- TABS -->
   <div class="tabs">
     <div class="tab active" data-tab="diff">Diff Coverage</div>
+    <% if failed_tests.any? -%>
+    <div class="tab" data-tab="failures" style="color: var(--red);">Failures <span style="font-family: var(--mono); font-size: 11px; background: var(--red-dim); color: var(--red); padding: 1px 6px; border-radius: 4px; margin-left: 4px;"><%= failed_tests.size %></span></div>
+    <% end -%>
     <div class="tab" data-tab="coverage">Coverage</div>
     <div class="tab" data-tab="performance">Performance</div>
     <div class="tab" data-tab="factories">Factory Health</div>
@@ -212,6 +215,11 @@
   <div class="tab-content active" id="tab-diff">
     <%= render_partial("tab_diff_coverage") %>
   </div>
+  <% if failed_tests.any? -%>
+  <div class="tab-content" id="tab-failures">
+    <%= render_partial("tab_failures") %>
+  </div>
+  <% end -%>
   <div class="tab-content" id="tab-coverage">
     <%= render_partial("tab_coverage") %>
   </div>
@@ -298,6 +306,17 @@ document.querySelectorAll('.cov-file-row').forEach(row => {
     if (e.target.closest('a')) return; // don't toggle when clicking links
     const detail = this.nextElementSibling;
     if (detail?.classList.contains('cov-file-detail')) {
+      detail.style.display = detail.style.display === 'none' ? '' : 'none';
+    }
+  });
+});
+
+// Failure row expand/collapse
+document.querySelectorAll('.failure-row').forEach(row => {
+  row.addEventListener('click', function(e) {
+    if (e.target.closest('a')) return;
+    const detail = this.nextElementSibling;
+    if (detail?.classList.contains('failure-detail')) {
       detail.style.display = detail.style.display === 'none' ? '' : 'none';
     }
   });

@@ -72,6 +72,10 @@ module TestReportKit
       @metrics[:slowest_tests] || []
     end
 
+    def failed_tests
+      @metrics[:failed_tests] || []
+    end
+
     def test_time_distribution
       @metrics[:test_time_distribution]
     end
@@ -80,14 +84,29 @@ module TestReportKit
       @metrics[:time_by_file] || []
     end
 
-    def build_test_source(file_path, line_number, max_lines: 15)
+    def build_test_source(file_path, line_number, max_lines: 30)
       path = file_path.to_s.sub(%r{^\./}, "")
       abs_path = File.join(@config.project_root, path)
       return nil unless File.exist?(abs_path)
 
-      lines = File.readlines(abs_path, chomp: true)
+      all_lines = File.readlines(abs_path, chomp: true)
       start = [line_number.to_i - 1, 0].max
-      lines[start, max_lines]&.each_with_index&.map { |content, i| { line: start + i + 1, content: content } }
+      first_line = all_lines[start]
+      return nil unless first_line
+
+      indent = first_line[/\A\s*/].length
+      result = []
+
+      all_lines[start..].each_with_index do |line, i|
+        if i > 0 && line.strip == "end" && line[/\A\s*/].length <= indent
+          result << { line: start + i + 1, content: line }
+          break
+        end
+        result << { line: start + i + 1, content: line }
+        break if result.size >= max_lines
+      end
+
+      result
     end
 
     def factory_health

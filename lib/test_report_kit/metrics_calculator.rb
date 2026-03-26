@@ -21,6 +21,7 @@ module TestReportKit
         file_coverage: file_coverage_list,
         rspec_summary: rspec_summary,
         slowest_tests: slowest_tests,
+        failed_tests: failed_tests,
         test_time_distribution: test_time_distribution,
         time_by_file: time_by_file,
         factory_health: factory_health,
@@ -136,10 +137,9 @@ module TestReportKit
     def slowest_tests
       return [] unless @rspec && @rspec["examples"]
 
-      # Show failed tests first, then by duration
       @rspec["examples"]
         .select { |e| e["run_time"] && e["status"] != "pending" }
-        .sort_by { |e| [e["status"] == "failed" ? 0 : 1, -e["run_time"]] }
+        .sort_by { |e| -e["run_time"] }
         .first(20)
         .map do |e|
           exc = e["exception"]
@@ -150,6 +150,23 @@ module TestReportKit
             status: e["status"],
             slow: e["run_time"] >= @config.slow_test_threshold,
             exception: exc ? { class: exc["class"], message: exc["message"], backtrace: (exc["backtrace"] || [])[0..4] } : nil
+          }
+        end
+    end
+
+    def failed_tests
+      return [] unless @rspec && @rspec["examples"]
+
+      @rspec["examples"]
+        .select { |e| e["status"] == "failed" }
+        .map do |e|
+          exc = e["exception"]
+          {
+            description: e["full_description"] || e["description"],
+            file: "#{e['file_path']}:#{e['line_number']}",
+            duration: (e["run_time"] || 0).round(2),
+            status: "failed",
+            exception: exc ? { class: exc["class"], message: exc["message"], backtrace: (exc["backtrace"] || [])[0..7] } : nil
           }
         end
     end
