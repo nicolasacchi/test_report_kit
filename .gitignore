@@ -10,3 +10,5 @@ tmp
 _yardoc
 doc
 Gemfile.lock
+*.png
+.playwright-mcp/
