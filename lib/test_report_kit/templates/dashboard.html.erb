@@ -153,8 +153,9 @@
 
   .file-viewer { max-height: 500px; overflow-y: auto; }
   .cov-line { display: flex; font-family: var(--mono); font-size: 12px; line-height: 1.8; border-bottom: 1px solid var(--border-subtle); }
-  .cov-line-num { width: 44px; text-align: right; padding: 1px 8px 1px 0; flex-shrink: 0; user-select: none; }
-  .cov-line-hits { width: 36px; text-align: right; padding: 1px 8px 1px 0; flex-shrink: 0; color: var(--text-muted); font-size: 10px; }
+  .cov-line-num { display: block; width: 44px; text-align: right; padding: 1px 8px 1px 0; flex-shrink: 0; user-select: none; text-decoration: none; color: inherit; font: inherit; }
+  a.cov-line-num:hover { text-decoration: underline; }
+  .cov-line-hits { width: 40px; text-align: right; padding: 1px 8px 1px 0; flex-shrink: 0; color: var(--text-muted); font-size: 10px; }
   .cov-line-code { padding: 1px 16px; white-space: pre; overflow-x: auto; flex: 1; }
   .cov-line-covered { background: rgba(34, 197, 94, 0.04); }
   .cov-line-covered .cov-line-num { color: var(--text-muted); border-right: 3px solid rgba(34, 197, 94, 0.3); }
@@ -165,6 +166,8 @@
   .cov-line-none .cov-line-num { color: var(--text-muted); border-right: 3px solid transparent; }
   .cov-file-row { cursor: pointer; }
   .cov-file-detail td { padding: 0 !important; }
+  .gh-icon { margin-left: 6px; color: var(--text-muted); opacity: 0.4; transition: opacity 0.2s; }
+  .gh-icon:hover { opacity: 1; }
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
