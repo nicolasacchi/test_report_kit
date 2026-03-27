@@ -84,3 +84,39 @@
   <% end -%>
 </div>
 <% end -%>
+
+<% th = trend_history -%>
+<% if th && th.is_a?(Array) && th.size > 1 -%>
+<%
+  cov_points = th.map { |e| e["coverage_pct"] }.compact
+  max_cov = [cov_points.max || 100, 100].min
+  min_cov = [(cov_points.min || 0) - 5, 0].max
+  range = max_cov - min_cov
+  range = 10 if range < 10
+-%>
+<div style="margin-bottom: 24px; padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 8px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+    <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);">Coverage Trend (<%= th.size %> runs)</span>
+    <span style="font-family: var(--mono); font-size: 11px; color: var(--text-muted);">
+      <% if cov_points.size >= 2 -%>
+      <% delta = (cov_points.last - cov_points.first).round(1) -%>
+      <span style="color: <%= delta >= 0 ? 'var(--green)' : 'var(--red)' %>; font-weight: 600;"><%= delta >= 0 ? "+#{delta}" : delta %>%</span> over <%= th.size %> runs
+      <% end -%>
+    </span>
+  </div>
+  <div style="display: flex; align-items: end; gap: 2px; height: 40px;">
+    <% cov_points.each do |pct| -%>
+    <%
+      height = range > 0 ? ((pct - min_cov) / range.to_f * 100).round(0) : 50
+      height = [[height, 5].max, 100].min
+      color = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--yellow)' : 'var(--red)'
+    -%>
+    <div style="flex: 1; height: <%= height %>%; background: <%= color %>; opacity: 0.7; border-radius: 2px 2px 0 0; min-height: 2px;" title="<%= pct %>%"></div>
+    <% end -%>
+  </div>
+  <div style="display: flex; justify-content: space-between; font-family: var(--mono); font-size: 9px; color: var(--text-muted); margin-top: 4px;">
+    <span><%= th.first["timestamp"]&.split("T")&.first %></span>
+    <span><%= th.last["timestamp"]&.split("T")&.first %></span>
+  </div>
+</div>
+<% end -%>

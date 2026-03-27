@@ -195,6 +195,10 @@ module TestReportKit
       @data_loader.respond_to?(:parallel_info_data) ? @data_loader.parallel_info_data : nil
     end
 
+    def trend_history
+      @data_loader.respond_to?(:trend_history_data) ? @data_loader.trend_history_data : nil
+    end
+
     def format_duration_val(seconds)
       return "—" unless seconds
       s = seconds.to_f
