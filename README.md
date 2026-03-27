@@ -2,11 +2,9 @@
 
 RSpec coverage + profiling HTML dashboard. Reads SimpleCov and test-prof output files, generates a single self-contained HTML report.
 
-**Live demos:** [passing](https://nicolasacchi.github.io/test_report_kit_demo/main/) | [diff coverage](https://nicolasacchi.github.io/test_report_kit_demo/feature-add-services/) | [failures](https://nicolasacchi.github.io/test_report_kit_demo/feature-failing-tests/) | [parallel](https://nicolasacchi.github.io/test_report_kit_demo/feature-parallel-tests/)
+**Live demos:** [passing](https://nicolasacchi.github.io/test_report_kit_demo/main/) | [diff coverage](https://nicolasacchi.github.io/test_report_kit_demo/feature-add-services/) | [failures](https://nicolasacchi.github.io/test_report_kit_demo/feature-failing-tests/)
 
 ## Setup
-
-### From GitHub
 
 ```ruby
 # Gemfile
@@ -18,22 +16,6 @@ group :test do
 end
 ```
 
-### From local path
-
-If you have the gem checked out locally (e.g. at `~/projects/test_report_kit`):
-
-```ruby
-# Gemfile
-group :test do
-  gem "test_report_kit", path: "~/projects/test_report_kit"
-  gem "simplecov", require: false
-  gem "simplecov-json", require: false
-  gem "test-prof", "~> 1.0"
-end
-```
-
-### Configure
-
 ```ruby
 # config/initializers/test_report_kit.rb
 if Rails.env.test?
@@ -44,21 +26,12 @@ if Rails.env.test?
 end
 ```
 
-### Run
-
 ```bash
 bundle exec rake test_report:full
 open tmp/test_report/index.html
 ```
 
 Auto-integrates via Railtie. No manual require needed.
-
-For non-Rails projects, add to your Rakefile:
-
-```ruby
-require "test_report_kit"
-load "tasks/test_report_kit.rake"
-```
 
 ## Rake Tasks
 
@@ -101,19 +74,12 @@ load "tasks/test_report_kit.rake"
 
 ## Output Files
 
-All written to `output_dir` (default `tmp/test_report/`):
-
 | File | Purpose |
 |------|---------|
-| `index.html` | Dashboard (self-contained, open in browser) |
+| `index.html` | Dashboard (self-contained) |
 | `summary.json` | CI consumption (PR comments, threshold gates) |
-| `report.md` | Markdown report with action items (for AI/code review tools) |
-| `resource_usage.json` | Peak memory (MB), CPU time (user/system seconds) |
-| `rspec_results.json` | Raw RSpec JSON output |
-| `factory_prof.json` | FactoryProf data |
-| `event_prof.json` | EventProf data |
-| `rspec_dissect.json` | RSpecDissect data |
-| `git_churn.json` | Per-file commit counts (last N days) |
+| `report.md` | Markdown report (for AI/code review tools) |
+| `resource_usage.json` | Peak memory, CPU time |
 
 ## CI Example
 
@@ -156,7 +122,9 @@ jobs:
       - run: bundle exec rake "test_report:merge[artifacts/test-results-*]"
 ```
 
-See [parallel demo](https://nicolasacchi.github.io/test_report_kit_demo/feature-parallel-tests/).
+The merge task combines coverage, RSpec results, profiler data, and resource metrics from all nodes. The Parallel tab shows per-node breakdown and balance analysis.
+
+See [parallel demo](https://nicolasacchi.github.io/test_report_kit_demo/feature-parallel-tests/) for a live example.
 
 ## Architecture
 
@@ -172,67 +140,11 @@ Runner → shells out to rspec with ENV vars (FPROF, EVENT_PROF, RD_PROF)
        → MarkdownExporter writes report.md
 ```
 
-## Trend Tracking (v0.2.0)
-
-The Runner automatically records key metrics after every `test_report:full` run to `trend_history.json`. After 2+ runs, a coverage trend sparkline chart appears below the summary cards.
-
-Each entry records: coverage %, branch coverage, duration, example count, failures, factory creates, peak memory.
-
-Keeps the last 30 entries. In CI, persist `trend_history.json` between runs (e.g. download from previous artifact or S3) to build history over time.
-
-**[Live demo](https://nicolasacchi.github.io/test_report_kit_demo/feature-v0.2.0-demo/)** — shows trend chart with 4 data points.
-
-## PR Comment Helper (v0.2.0)
-
-Generate a formatted markdown comment from `summary.json`:
-
-```ruby
-require "test_report_kit/pr_comment"
-markdown = TestReportKit::PRComment.format("tmp/test_report/summary.json")
-```
-
-Use in GitHub Actions to post a PR comment:
-
-```yaml
-- name: Post PR comment
-  if: github.event_name == 'pull_request'
-  uses: actions/github-script@v7
-  with:
-    script: |
-      const fs = require('fs');
-      // Read the pre-generated pr_comment.md (generated in a prior step)
-      const body = fs.readFileSync('tmp/test_report/pr_comment.md', 'utf8');
-      const {data:comments} = await github.rest.issues.listComments({
-        owner: context.repo.owner, repo: context.repo.repo,
-        issue_number: context.issue.number
-      });
-      const ex = comments.find(c => c.body?.includes('Test Report'));
-      const p = {owner: context.repo.owner, repo: context.repo.repo, body};
-      if (ex) await github.rest.issues.updateComment({...p, comment_id: ex.id});
-      else await github.rest.issues.createComment({...p, issue_number: context.issue.number});
-```
-
-Generate the markdown in a prior step:
-
-```yaml
-- name: Generate PR comment
-  run: |
-    bundle exec ruby -e "
-      require 'test_report_kit/pr_comment'
-      File.write('tmp/test_report/pr_comment.md',
-        TestReportKit::PRComment.format('tmp/test_report/summary.json'))
-    "
-```
-
-Output includes: diff coverage badge, coverage/duration/examples table, top risks, uncovered files.
-
 ## Development
 
 ```bash
-git clone https://github.com/nicolasacchi/test_report_kit.git
-cd test_report_kit
 docker compose build
-docker compose run --rm gem bundle exec rspec   # 87 specs
+docker compose run --rm gem bundle exec rspec   # 81 specs
 ```
 
 MIT License

@@ -234,32 +234,3 @@ GitHub Actions workflow: test → deploy to GitHub Pages (per-branch subdirector
 **Parallel tab** (`_tab_parallel.html.erb`): conditional, only shows when `parallel_info.json` exists.
 
 **Critical gotcha:** `actions/upload-artifact@v4` skips hidden files by default. SimpleCov's `.resultset.json` starts with a dot. Must set `include-hidden-files: true`.
-
-## v0.2.0 Features
-
-### Trend Tracking (`lib/test_report_kit/trend_tracker.rb`)
-- Automatically appends metrics to `trend_history.json` after every `generate_report` call
-- Records: coverage_pct, branch_coverage_pct, diff_coverage_pct, duration, examples, failures, factory creates, peak memory
-- Keeps last 30 entries (MAX_ENTRIES constant)
-- Dashboard shows sparkline bar chart when 2+ entries exist (in `_summary_cards.html.erb`)
-- Bars colored green/yellow/red by coverage %, with delta displayed
-- In CI: persist `trend_history.json` between runs to accumulate history
-
-### PR Comment Helper (`lib/test_report_kit/pr_comment.rb`)
-- `TestReportKit::PRComment.format(summary_path)` → markdown string
-- Sections: diff coverage badge, metrics table, top 3 risks, uncovered files list
-- Handles nil/missing fields gracefully
-- Use from CI: generate to file, then read in github-script action
-- No GitHub API dependency — just formats markdown from summary.json
-
-### CLI Binary (`exe/test_report_kit`) — optional, not required
-- Standalone command for non-Rails projects
-- Modes: full, coverage, profile, generate, merge
-- Reads `.test_report_kit.yml` for config (or CLI flags)
-- Flags: --config, --output-dir, --github-url, --base-branch, --fail-on-coverage, --fail-on-diff-coverage
-
-### Demo
-- Branch: `feature/v0.2.0-demo` on demo repo
-- Workflow runs 5x to build trend history
-- Generates `pr_comment.md` using PRComment
-- Live: nicolasacchi.github.io/test_report_kit_demo/feature-v0.2.0-demo/
