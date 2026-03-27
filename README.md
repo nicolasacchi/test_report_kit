@@ -172,6 +172,60 @@ Runner → shells out to rspec with ENV vars (FPROF, EVENT_PROF, RD_PROF)
        → MarkdownExporter writes report.md
 ```
 
+## Trend Tracking (v0.2.0)
+
+The Runner automatically records key metrics after every `test_report:full` run to `trend_history.json`. After 2+ runs, a coverage trend sparkline chart appears below the summary cards.
+
+Each entry records: coverage %, branch coverage, duration, example count, failures, factory creates, peak memory.
+
+Keeps the last 30 entries. In CI, persist `trend_history.json` between runs (e.g. download from previous artifact or S3) to build history over time.
+
+**[Live demo](https://nicolasacchi.github.io/test_report_kit_demo/feature-v0.2.0-demo/)** — shows trend chart with 4 data points.
+
+## PR Comment Helper (v0.2.0)
+
+Generate a formatted markdown comment from `summary.json`:
+
+```ruby
+require "test_report_kit/pr_comment"
+markdown = TestReportKit::PRComment.format("tmp/test_report/summary.json")
+```
+
+Use in GitHub Actions to post a PR comment:
+
+```yaml
+- name: Post PR comment
+  if: github.event_name == 'pull_request'
+  uses: actions/github-script@v7
+  with:
+    script: |
+      const fs = require('fs');
+      // Read the pre-generated pr_comment.md (generated in a prior step)
+      const body = fs.readFileSync('tmp/test_report/pr_comment.md', 'utf8');
+      const {data:comments} = await github.rest.issues.listComments({
+        owner: context.repo.owner, repo: context.repo.repo,
+        issue_number: context.issue.number
+      });
+      const ex = comments.find(c => c.body?.includes('Test Report'));
+      const p = {owner: context.repo.owner, repo: context.repo.repo, body};
+      if (ex) await github.rest.issues.updateComment({...p, comment_id: ex.id});
+      else await github.rest.issues.createComment({...p, issue_number: context.issue.number});
+```
+
+Generate the markdown in a prior step:
+
+```yaml
+- name: Generate PR comment
+  run: |
+    bundle exec ruby -e "
+      require 'test_report_kit/pr_comment'
+      File.write('tmp/test_report/pr_comment.md',
+        TestReportKit::PRComment.format('tmp/test_report/summary.json'))
+    "
+```
+
+Output includes: diff coverage badge, coverage/duration/examples table, top risks, uncovered files.
+
 ## Development
 
 ```bash
