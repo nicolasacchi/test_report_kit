@@ -71,6 +71,8 @@
 
   .header-meta { display: flex; align-items: center; gap: 20px; font-size: 12px; color: var(--text-muted); font-family: var(--mono); }
   .header-meta code { color: var(--text-secondary); background: var(--bg-elevated); padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+  .dl-btn { display: inline-flex; align-items: center; gap: 4px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-muted); font-family: var(--mono); font-size: 11px; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: border-color 0.2s, color 0.2s; }
+  .dl-btn:hover { border-color: var(--accent); color: var(--text-secondary); }
 
   .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin: 24px 0; }
   .card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 20px 24px; position: relative; overflow: hidden; transition: border-color 0.2s; }
@@ -193,6 +195,12 @@
       <span><%= timestamp %></span>
       <span>branch <code><%= h(branch) %></code></span>
       <span>sha <code><%= h(sha) %></code></span>
+      <% if markdown_content -%>
+      <button id="dl-md" class="dl-btn" title="Download report.md">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>.md</span>
+      </button>
+      <% end -%>
     </div>
   </div>
 
@@ -244,6 +252,9 @@
 </div>
 
 <script type="application/json" id="report-data"><%= json_data %></script>
+<% if markdown_content -%>
+<script type="text/plain" id="report-md"><%= embedded_markdown %></script>
+<% end -%>
 <script>
 // Tab switching
 document.querySelectorAll('.tab').forEach(tab => {
@@ -364,6 +375,24 @@ document.querySelectorAll('.diff-file-toggle').forEach(toggle => {
     }
   });
 });
+
+// Markdown download
+const dlBtn = document.getElementById('dl-md');
+if (dlBtn) {
+  dlBtn.addEventListener('click', function() {
+    const md = document.getElementById('report-md');
+    if (!md) return;
+    const blob = new Blob([md.textContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'report.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+}
 </script>
 
 </body>

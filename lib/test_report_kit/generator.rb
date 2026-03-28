@@ -9,11 +9,12 @@ module TestReportKit
   class Generator
     TEMPLATE_DIR = File.expand_path("templates", __dir__)
 
-    def initialize(metrics:, diff_coverage:, data_loader:, config: TestReportKit.configuration)
-      @metrics       = metrics
-      @diff_coverage = diff_coverage
-      @data_loader   = data_loader
-      @config        = config
+    def initialize(metrics:, diff_coverage:, data_loader:, config: TestReportKit.configuration, markdown_content: nil)
+      @metrics          = metrics
+      @diff_coverage    = diff_coverage
+      @data_loader      = data_loader
+      @config           = config
+      @markdown_content = markdown_content
     end
 
     def generate
@@ -193,6 +194,15 @@ module TestReportKit
 
     def parallel_info
       @data_loader.respond_to?(:parallel_info_data) ? @data_loader.parallel_info_data : nil
+    end
+
+    def markdown_content
+      @markdown_content
+    end
+
+    def embedded_markdown
+      return "" unless @markdown_content
+      @markdown_content.gsub("</script>", "<\\/script>")
     end
 
     def format_duration_val(seconds)

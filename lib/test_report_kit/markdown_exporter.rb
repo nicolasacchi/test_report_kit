@@ -14,22 +14,24 @@ module TestReportKit
     def export
       output_path = File.join(@config.output_dir, "report.md")
       FileUtils.mkdir_p(@config.output_dir)
-      File.write(output_path, build_markdown)
+      File.write(output_path, build)
       output_path
     end
 
-    private
-
-    def build_markdown
-      sections = []
-      sections << header_section
-      sections << summary_section
-      sections << diff_coverage_section
-      sections << low_coverage_section
-      sections << factory_section
-      sections << action_items_section
-      sections.compact.join("\n\n---\n\n")
+    def build
+      @build ||= begin
+        sections = []
+        sections << header_section
+        sections << summary_section
+        sections << diff_coverage_section
+        sections << low_coverage_section
+        sections << factory_section
+        sections << action_items_section
+        sections.compact.join("\n\n---\n\n")
+      end
     end
+
+    private
 
     def header_section
       "# Test Report: #{@config.resolved_project_name}\n\n" \

@@ -190,20 +190,23 @@ module TestReportKit
         config: @config
       ).call
 
+      md_exporter = MarkdownExporter.new(
+        metrics: metrics,
+        diff_coverage: diff_coverage,
+        config: @config
+      )
+      markdown_content = md_exporter.build
+      md_path = md_exporter.export
+
       report_path = Generator.new(
         metrics: metrics,
         diff_coverage: diff_coverage,
         data_loader: loader,
-        config: @config
+        config: @config,
+        markdown_content: markdown_content
       ).generate
 
       summary_path = SummaryExporter.new(
-        metrics: metrics,
-        diff_coverage: diff_coverage,
-        config: @config
-      ).export
-
-      md_path = MarkdownExporter.new(
         metrics: metrics,
         diff_coverage: diff_coverage,
         config: @config
