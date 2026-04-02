@@ -250,24 +250,7 @@ module TestReportKit
     end
 
     def build_file_line_data(relative_path)
-      simplecov = @data_loader.simplecov_data
-      return nil unless simplecov
-
-      abs_path = File.join(@config.project_root, relative_path)
-      cov_data = simplecov[abs_path]
-
-      # Fallback: match by suffix
-      unless cov_data
-        simplecov.each do |path, data|
-          if path.end_with?("/#{relative_path}")
-            cov_data = data
-            break
-          end
-        end
-      end
-      return nil unless cov_data
-
-      lines_array = cov_data.is_a?(Hash) ? cov_data["lines"] : cov_data
+      lines_array = resolve_simplecov_lines(relative_path)
       return nil unless lines_array
 
       source_path = File.join(@config.project_root, relative_path)
@@ -288,9 +271,57 @@ module TestReportKit
       }.to_json
     end
 
+    def coverage_file_data_json
+      return "{}" unless @data_loader.simplecov_data
+
+      result = {}
+      file_coverage.each do |f|
+        next if f[:coverage_pct] >= 100
+
+        line_data = resolve_simplecov_lines(f[:path])
+        next unless line_data
+
+        source_path = File.join(@config.project_root, f[:path])
+        next unless File.exist?(source_path)
+
+        result[f[:path]] = {
+          lines: File.readlines(source_path, chomp: true),
+          cov: line_data
+        }
+      end
+
+      result.to_json
+    end
+
+    def coverage_config_json
+      { github_url: @config.github_url, sha: sha }.to_json
+    end
+
     def all_passing?
       return true unless rspec_summary
       (rspec_summary[:failure_count] || 0) == 0
+    end
+
+    private
+
+    def resolve_simplecov_lines(relative_path)
+      simplecov = @data_loader.simplecov_data
+      return nil unless simplecov
+
+      abs_path = File.join(@config.project_root, relative_path)
+      cov_data = simplecov[abs_path]
+
+      unless cov_data
+        simplecov.each do |path, data|
+          if path.end_with?("/#{relative_path}")
+            cov_data = data
+            break
+          end
+        end
+      end
+      return nil unless cov_data
+
+      cov_data.is_a?(Hash) ? cov_data["lines"] : cov_data
     end
   end
 end

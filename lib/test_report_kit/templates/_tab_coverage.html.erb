@@ -27,7 +27,7 @@
     </thead>
     <tbody>
       <% file_coverage.each do |f| -%>
-      <tr class="cov-file-row" data-cov-pct="<%= f[:coverage_pct] %>"<%= f[:coverage_pct] >= 100 ? ' style="display:none;"' : '' %>>
+      <tr class="cov-file-row" data-cov-pct="<%= f[:coverage_pct] %>" data-path="<%= h(f[:path]) %>"<%= f[:coverage_pct] >= 100 ? ' style="display:none;"' : '' %>>
         <td><div class="file-path"><%= file_link(f[:path]) %></div></td>
         <td>
           <div class="cov-bar">
@@ -40,35 +40,6 @@
         <td><span class="num"><%= f[:churn] %></span></td>
         <td><span class="risk-score" style="background: <%= risk_bg(f[:risk_score]) %>; color: <%= risk_color(f[:risk_score]) %>;"><%= f[:risk_score] %></span></td>
       </tr>
-      <% line_data = build_file_line_data(f[:path]) -%>
-      <% if line_data -%>
-      <tr class="cov-file-detail" style="display:none;">
-        <td colspan="6" style="padding: 0;">
-          <div class="file-viewer">
-            <% line_data.each do |l| -%>
-            <%
-              css_class = if l[:executed].nil?
-                "cov-line cov-line-none"
-              elsif l[:executed] > 0
-                "cov-line cov-line-covered"
-              else
-                "cov-line cov-line-uncovered"
-              end
-            -%>
-            <div class="<%= css_class %>">
-              <% if @config.github_url -%>
-              <a href="<%= h(@config.github_url) %>/blob/<%= sha %>/<%= f[:path] %>#L<%= l[:line] %>" target="_blank" rel="noopener" class="cov-line-num"><%= l[:line] %></a>
-              <% else -%>
-              <div class="cov-line-num"><%= l[:line] %></div>
-              <% end -%>
-              <div class="cov-line-hits"><%= l[:executed].nil? ? '' : "#{l[:executed]}x" %></div>
-              <div class="cov-line-code"><%= highlight_ruby(l[:content]) %></div>
-            </div>
-            <% end -%>
-          </div>
-        </td>
-      </tr>
-      <% end -%>
       <% end -%>
     </tbody>
   </table>
