@@ -250,4 +250,28 @@ RSpec.describe TestReportKit::Runner do
       expect(content).not_to include("minimum_coverage ")
     end
   end
+
+  describe "simplecov_track_files config" do
+    let(:runner) { described_class.new(config, mode: :coverage) }
+
+    it "emits a `track_files` line by default so the denominator is stable across shards" do
+      content = runner.send(:simplecov_init_content)
+      expect(content).to include('track_files "{app,lib}/**/*.rb"')
+    end
+
+    it "respects a custom glob" do
+      config.simplecov_track_files = "engines/*/app/**/*.rb"
+      content = runner.send(:simplecov_init_content)
+      expect(content).to include('track_files "engines/*/app/**/*.rb"')
+    end
+
+    it "omits track_files when explicitly disabled (Codecov-style lazy denominator)" do
+      config.simplecov_track_files = nil
+      content = runner.send(:simplecov_init_content)
+      expect(content).not_to include("track_files")
+      # The init must still parse as valid Ruby — sanity check the structural lines.
+      expect(content).to include("SimpleCov.start 'rails'")
+      expect(content).to include("enable_coverage :branch")
+    end
+  end
 end

@@ -15,7 +15,8 @@ module TestReportKit
                   :github_url,
                   :event_prof_event,
                   :fail_on_coverage,
-                  :fail_on_diff_coverage
+                  :fail_on_diff_coverage,
+                  :simplecov_track_files
 
     def initialize
       @project_name             = nil
@@ -32,6 +33,12 @@ module TestReportKit
       @event_prof_event         = "factory.create"
       @fail_on_coverage         = false
       @fail_on_diff_coverage    = false
+      # Glob passed to SimpleCov.track_files in the auto-generated init. With this set,
+      # SimpleCov pre-registers every matching project file at finalization, so the
+      # denominator stays stable across single-process and sharded runs (lazy-loading
+      # no longer changes which files are "seen"). Set to nil to opt out and match a
+      # Codecov-style number that only counts files actually autoloaded.
+      @simplecov_track_files    = "{app,lib}/**/*.rb"
     end
 
     def resolved_project_name
