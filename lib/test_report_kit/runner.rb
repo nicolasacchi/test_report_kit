@@ -88,16 +88,18 @@ module TestReportKit
     end
 
     def setup_simplecov
-      # Check if the host app already configures SimpleCov
-      spec_helper = File.join(@config.project_root, "spec", "spec_helper.rb")
-      if File.exist?(spec_helper) && File.read(spec_helper).include?("SimpleCov")
-        puts "TestReportKit: Using existing SimpleCov configuration from spec/spec_helper.rb"
-        return
-      end
+      # Only treat the host's SimpleCov as authoritative when it lives in a file that's
+      # loaded unconditionally on every RSpec run: `.simplecov` (loaded by SimpleCov gem
+      # itself on require) or `spec/spec_helper.rb` (loaded by `--require rails_helper`
+      # which always loads spec_helper). `spec/rails_helper.rb` is intentionally NOT
+      # checked here — Rails apps frequently gate SimpleCov on `ENV['CI']` there, in
+      # which case detection would skip our generated init and no coverage would be
+      # collected during local runs.
+      %w[.simplecov spec/spec_helper.rb].each do |relative|
+        path = File.join(@config.project_root, relative)
+        next unless File.exist?(path) && File.read(path).include?("SimpleCov.start")
 
-      simplecov_file = File.join(@config.project_root, ".simplecov")
-      if File.exist?(simplecov_file)
-        puts "TestReportKit: Using existing SimpleCov configuration from .simplecov"
+        puts "TestReportKit: Using existing SimpleCov configuration from #{relative}"
         return
       end
 
@@ -130,7 +132,11 @@ module TestReportKit
       cmd_parts += ENV["TEST_REPORT_SPECS"].split if ENV["TEST_REPORT_SPECS"]
       cmd_parts += ["--require", @simplecov_init_path] if coverage && @simplecov_init_path
       cmd_parts += ["--format", "json", "--out", rspec_json_path]
-      cmd_parts += ["--format", "progress"]
+      # Don't add `--format progress` here. RSpec's default formatter is already `progress`
+      # when no formatter is configured, and adding another explicit one stacks on top of any
+      # formatter the host project configures (e.g. Fuubar in `RSpec.configure`), which makes
+      # the captured `test_output.log` contain every line twice and breaks profiler parsing
+      # downstream because section boundaries get duplicated.
 
       puts "TestReportKit: Running RSpec..."
       start_cpu = Process.times
@@ -252,13 +258,15 @@ module TestReportKit
 
       content = File.read(log_path)
 
-      # Extract EventProf section (stop at RSpecDissect, Finished, or end)
-      if (match = content.match(/EventProf results for .+?(?=\n\nRSpecDissect|\n\nFinished in|\n\n\d+ examples|\z)/m))
+      # test-prof prefixes its own output with "[TEST PROF INFO] " — match optionally so
+      # both raw RSpec stdout and test-prof-tagged stdout split into the same sections.
+      tp_prefix = '(?:\[TEST PROF INFO\] )?'
+
+      if (match = content.match(/#{tp_prefix}EventProf results for .+?(?=\n\n#{tp_prefix}RSpecDissect|\n\nFinished in|\n\n\d+ examples|\z)/m))
         File.write(File.join(@config.output_dir, "event_prof_output.txt"), match[0])
       end
 
-      # Extract RSpecDissect section (stop at EventProf, Finished, or end)
-      if (match = content.match(/RSpecDissect report.+?(?=\n\nEventProf|\n\nFinished in|\n\n\d+ examples|\z)/m))
+      if (match = content.match(/#{tp_prefix}RSpecDissect report.+?(?=\n\n#{tp_prefix}EventProf|\n\nFinished in|\n\n\d+ examples|\z)/m))
         File.write(File.join(@config.output_dir, "rspec_dissect_output.txt"), match[0])
       end
     end
@@ -284,7 +292,7 @@ module TestReportKit
 
       suites = []
       # Handle both en-dash and hyphen: description (location) – time (count / examples) of run_time (pct%)
-      content.scan(/^(.+?) \((.+?)\) [\u2013\-] ([\d:.]+) \((\d+) \/ (\d+)\) of ([\d:.]+) \(([\d.]+)%\)/m) do
+      content.scan(/^([^\n()]+?) \(([^\n()]+?)\) [\u2013\-] ([\d:.]+) \((\d+) \/ (\d+)\) of ([\d:.]+) \(([\d.]+)%\)/) do
         suites << {
           "description" => $1.strip, "location" => $2, "time" => $3,
           "event_count" => $4.to_i, "example_count" => $5.to_i,
@@ -312,23 +320,34 @@ module TestReportKit
 
       suites = []
       # Pattern: description (location) – setup_time (pct%) of total_time (count)
-      content.scan(/^(.+?) \((.+?)\) [\u2013\-] ([\d:.]+) \(([\d.]+)%\) of ([\d:.]+) \((\d+)\)/m) do
+      # test-prof's current dissect output is `description (location) \u2013 setup_time of total_time (count)`.
+      # Older versions emitted `(pct%)` between setup_time and "of"; we match it optionally.
+      # The same suite appears twice \u2014 once under "by `let` time" and once under "by `before(:each)` time"
+      # \u2014 so we keep the larger reading per location.
+      content.scan(/^([^\n()]+?) \(([^\n()]+?)\) [\u2013\-] ([\d:.]+)(?: \(([\d.]+)%\))? of ([\d:.]+) \((\d+)\)/) do
         total_secs = parse_duration($5)
-        before_pct = $4.to_f
-        before_secs = total_secs * before_pct / 100
-        example_secs = total_secs - before_secs
+        section_secs = parse_duration($3)
+        section_pct = $4 ? $4.to_f : (total_secs.zero? ? 0.0 : (section_secs / total_secs * 100))
+
+        existing = suites.find { |s| s["location"] == $2 }
+        next if existing && existing[:_section_secs] >= section_secs
+        suites.delete(existing) if existing
+
+        example_secs = [total_secs - section_secs, 0.0].max
 
         suites << {
           "description" => $1.strip, "location" => $2,
           "total_time" => $5, "example_count" => $6.to_i,
-          "before_time" => format_duration_short(before_secs),
+          "before_time" => format_duration_short(section_secs),
           "let_time" => "00:00.000",
           "example_time" => format_duration_short(example_secs),
-          "before_pct" => before_pct.round(1),
+          "before_pct" => section_pct.round(1),
           "let_pct" => 0.0,
-          "example_pct" => (100 - before_pct).round(1)
+          "example_pct" => (100 - section_pct).round(1),
+          :_section_secs => section_secs
         }
       end
+      suites.each { |s| s.delete(:_section_secs) }
 
       result = { "total_time" => total_match&.[](1), "suites" => suites }
       json_path = File.join(@config.output_dir, "rspec_dissect.json")
@@ -353,7 +372,6 @@ module TestReportKit
     end
 
     def simplecov_init_content
-      threshold = @config.coverage_threshold
       <<~RUBY
         # Auto-generated by TestReportKit — do not edit
         require 'simplecov'
@@ -381,8 +399,8 @@ module TestReportKit
             SimpleCov::Formatter::JSONFormatter
           ])
 
-          minimum_coverage #{threshold}
-          minimum_coverage_by_file 50
+          # Threshold gating is handled by TestReportKit (`fail_on_coverage` config) so the
+          # rake task's exit code reflects the gem's gate, not SimpleCov's own check.
         end
       RUBY
     end
