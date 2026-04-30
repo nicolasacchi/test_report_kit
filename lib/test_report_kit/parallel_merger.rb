@@ -103,7 +103,20 @@ module TestReportKit
     # ── FactoryProf ──
 
     def merge_factory_prof
-      files = collect("factory_prof.json") + collect("test-prof.result.json", subdirs: ["tmp/test_prof"])
+      # Per shard, prefer the gem's own copy (factory_prof.json) and only fall back to
+      # the raw test-prof artifact (tmp/test_prof/test-prof.result.json) when the copy
+      # is missing. Without this, shards that uploaded both files (the common CI layout
+      # — `coverage/`, `tmp/test_report/`, and `tmp/test_prof/` are all artifacted) get
+      # their factory totals counted twice.
+      files = @dirs.filter_map do |dir|
+        candidates = [
+          File.join(dir, "factory_prof.json"),
+          File.join(dir, "tmp/test_report/factory_prof.json"),
+          File.join(dir, "tmp/test_prof/test-prof.result.json"),
+          File.join(dir, "test-prof.result.json")
+        ]
+        candidates.find { |p| File.exist?(p) }
+      end
       return if files.empty?
 
       total_count = total_top_level = 0

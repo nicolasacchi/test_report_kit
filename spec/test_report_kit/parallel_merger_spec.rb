@@ -122,4 +122,29 @@ RSpec.describe TestReportKit::ParallelMerger do
       expect(data["efficiency"]).to be_a(Numeric)
     end
   end
+
+  describe "factory_prof source preference" do
+    # When CI uploads `coverage/`, `tmp/test_report/`, and `tmp/test_prof/` as part of
+    # the same artifact, each node ends up with both the gem's copy of factory_prof.json
+    # AND test-prof's raw test-prof.result.json. They contain the same data; counting both
+    # would double every total. The merger should pick exactly one source per node.
+    it "does not double-count when both factory_prof.json and test-prof.result.json exist" do
+      same_payload = {
+        "total_count" => 30, "total_top_level_count" => 20, "total_time" => "1.5s",
+        "stats" => [{ "name" => "user", "total_count" => 20, "top_level_count" => 15, "total_time" => 0.8 }]
+      }
+
+      FileUtils.mkdir_p(File.join(node0_dir, "tmp/test_prof"))
+      File.write(File.join(node0_dir, "tmp/test_prof/test-prof.result.json"), JSON.generate(same_payload))
+      # node0_dir/factory_prof.json was already written in the outer `before` block.
+
+      merger.merge!
+      data = JSON.parse(File.read(File.join(config.output_dir, "factory_prof.json")))
+
+      # Without the fix this is 50 (20 from each source on node 0 + 15 from node 1).
+      user = data["stats"].find { |s| s["name"] == "user" }
+      expect(user["total_count"]).to eq(35)
+      expect(data["total_count"]).to eq(55)
+    end
+  end
 end
