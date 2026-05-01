@@ -25,7 +25,7 @@
     <div class="card-sub">
       branch: <%= overall_coverage[:branch_coverage_pct] %>%
       <% if overall_coverage[:executed_coverage_pct] -%>
-      &middot; <span title="Lines whose execution count exceeds the eager-load baseline (<%= overall_coverage[:node_count] %> per shard) — i.e. actually called by tests, not just by class loading.">executed: <%= overall_coverage[:executed_coverage_pct] %>%</span>
+      &middot; <span title="Share of testable lines exercised by tests. Denominator excludes <%= format_number(overall_coverage[:load_only_lines]) %> load-only declarations (class/module/def headers, validates, has_many, scope, private, etc. — they execute exactly once per shard from class loading and physically can never go higher even when the methods around them are heavily tested). Numerator: lines with execution count > 0 but ≠ <%= overall_coverage[:node_count] %> (the per-shard load baseline).">executed: <%= overall_coverage[:executed_coverage_pct] %>%</span>
       <% end -%>
       &middot; threshold: <%= @config.coverage_threshold %>%
     </div>

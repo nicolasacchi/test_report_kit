@@ -48,7 +48,7 @@ module TestReportKit
       if cov
         lines << "| Line Coverage | #{cov[:coverage_pct]}% (#{cov[:covered_lines]}/#{cov[:total_lines]}) |"
         if cov[:executed_coverage_pct]
-          lines << "| Executed Coverage | #{cov[:executed_coverage_pct]}% (#{cov[:executed_lines]}/#{cov[:total_lines]}) — lines actually run by tests, beyond eager-load |"
+          lines << "| Executed Coverage | #{cov[:executed_coverage_pct]}% (#{cov[:executed_lines]}/#{cov[:testable_lines]}) — share of testable lines exercised by tests; denominator excludes #{cov[:load_only_lines]} load-only declarations (class/module/def headers, validates, etc.) |"
         end
         lines << "| Branch Coverage | #{cov[:branch_coverage_pct]}% |"
       end

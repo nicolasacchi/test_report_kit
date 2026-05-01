@@ -77,24 +77,23 @@ RSpec.describe TestReportKit::MetricsCalculator do
     end
 
     describe "executed coverage (load-only vs test-exercised)" do
-      # Three files. With node_count=1 ALL count==1 lines stay in `covered` (matches
-      # SimpleCov default) but ONLY count>=2 lines count as `executed`. With
-      # node_count=7, the threshold rises and the count==1 lines that were "executed"
-      # in the smaller-N case fall back below.
+      # Test fixture covering all four buckets: count==0 (uncovered), count==N
+      # (load-only), count between 1 and N-1 (called in some shards), count > N
+      # (called many times).
       let(:simplecov_data) do
         {
-          "/app/app/models/loaded_only.rb"  => { "lines" => [1, 1, 1, nil],   "branches" => {} },
-          "/app/app/models/half_exercised.rb" => { "lines" => [1, 5, nil, 0], "branches" => {} },
-          "/app/app/models/heavy.rb"          => { "lines" => [9, 12, nil, 8], "branches" => {} }
+          "/app/app/models/loaded_only.rb"    => { "lines" => [1, 1, 1, nil],     "branches" => {} },
+          "/app/app/models/half_exercised.rb" => { "lines" => [1, 5, nil, 0],     "branches" => {} },
+          "/app/app/models/heavy.rb"          => { "lines" => [9, 12, nil, 8],    "branches" => {} }
         }
       end
 
-      # Fixture has 9 executable lines (12 entries, 3 nil), 8 with count > 0:
-      #   loaded_only:    [1, 1, 1]     → 3 covered, 0 above 1, 0 above 7
-      #   half_exercised: [1, 5,    0]  → 2 covered, 1 above 1 (the 5), 0 above 7
-      #   heavy:          [9, 12,   8]  → 3 covered, 3 above 1, 3 above 7
+      # 9 executable (12 entries minus 3 nils), 8 covered (1 zero):
+      #   loaded_only:    [1, 1, 1]      → all count==1
+      #   half_exercised: [1, 5, 0]      → one count==1, one count==5, one count==0
+      #   heavy:          [9, 12, 8]     → all count > 7
 
-      it "with node_count=1, counts every count>1 line as executed" do
+      it "with node_count=1, count==1 lines are load-only and exclusion shifts to numerator + denominator" do
         calc = described_class.new(
           simplecov_data: simplecov_data, rspec_data: rspec_data,
           factory_prof_data: factory_prof_data, event_prof_data: event_prof_data,
@@ -105,42 +104,63 @@ RSpec.describe TestReportKit::MetricsCalculator do
         expect(cov[:total_lines]).to eq(9)
         expect(cov[:covered_lines]).to eq(8)
         expect(cov[:coverage_pct]).to eq(88.9)
-        expect(cov[:executed_lines]).to eq(4) # 5, 9, 12, 8
-        expect(cov[:executed_coverage_pct]).to eq(44.4)
+        # Load-only (count == 1): loaded_only[1,1,1] + half_exercised first [1] = 4
+        expect(cov[:load_only_lines]).to eq(4)
+        expect(cov[:testable_lines]).to eq(5) # 9 total − 4 load-only
+        # Executed (count > 0 AND count != 1): half_exercised[5] + heavy[9,12,8] = 4
+        expect(cov[:executed_lines]).to eq(4)
+        # Of testable lines, 4 of 5 exercised
+        expect(cov[:executed_coverage_pct]).to eq(80.0)
         expect(cov[:node_count]).to eq(1)
       end
 
-      it "with node_count=7, raises the threshold so count<=7 lines aren't executed" do
+      it "with node_count=7, count==7 lines are load-only and the smaller-count lines join executed" do
+        # Bump heavy.rb to also include a count==7 line (load-only bucket at N=7).
+        simplecov = {
+          "/app/app/models/loaded_only.rb"    => { "lines" => [7, 7, 7, nil],    "branches" => {} },
+          "/app/app/models/half_exercised.rb" => { "lines" => [7, 5, nil, 0],    "branches" => {} },
+          "/app/app/models/heavy.rb"          => { "lines" => [9, 12, nil, 8],   "branches" => {} }
+        }
         calc = described_class.new(
-          simplecov_data: simplecov_data, rspec_data: rspec_data,
+          simplecov_data: simplecov, rspec_data: rspec_data,
           factory_prof_data: factory_prof_data, event_prof_data: event_prof_data,
           rspec_dissect_data: rspec_dissect_data, git_churn_data: git_churn_data,
           diff_coverage: diff_coverage, config: config, node_count: 7
         )
         cov = calc.call[:overall_coverage]
-        # covered_lines unchanged (still uses count > 0)
         expect(cov[:covered_lines]).to eq(8)
         expect(cov[:coverage_pct]).to eq(88.9)
-        # Lines with count > 7: heavy[9, 12, 8] only = 3
-        expect(cov[:executed_lines]).to eq(3)
-        expect(cov[:executed_coverage_pct]).to eq(33.3)
+        # Load-only (count == 7): loaded_only[7,7,7] + half_exercised first [7] = 4
+        expect(cov[:load_only_lines]).to eq(4)
+        expect(cov[:testable_lines]).to eq(5)
+        # Executed (count > 0 AND count != 7): half_exercised[5] + heavy[9,12,8] = 4
+        expect(cov[:executed_lines]).to eq(4)
+        expect(cov[:executed_coverage_pct]).to eq(80.0)
         expect(cov[:node_count]).to eq(7)
       end
 
-      it "exposes per-file executed_coverage_pct in file_coverage_list" do
+      it "exposes per-file metrics with the testable denominator" do
         calc = described_class.new(
           simplecov_data: simplecov_data, rspec_data: rspec_data,
           factory_prof_data: factory_prof_data, event_prof_data: event_prof_data,
           rspec_dissect_data: rspec_dissect_data, git_churn_data: git_churn_data,
-          diff_coverage: diff_coverage, config: config, node_count: 7
+          diff_coverage: diff_coverage, config: config, node_count: 1
         )
         files = calc.call[:file_coverage]
         loaded = files.find { |f| f[:path] == "app/models/loaded_only.rb" }
         heavy  = files.find { |f| f[:path] == "app/models/heavy.rb" }
+
+        # loaded_only.rb: 3 lines all count==1 → 100% covered, 0 testable, 0% executed
         expect(loaded[:coverage_pct]).to eq(100.0)
-        expect(loaded[:executed_coverage_pct]).to eq(0.0)  # all 3 lines have count=1, none > 7
+        expect(loaded[:load_only_lines]).to eq(3)
+        expect(loaded[:testable_lines]).to eq(0)
+        expect(loaded[:executed_coverage_pct]).to eq(0.0)
+
+        # heavy.rb: 3 lines all count > 1 → 100% covered, 3 testable, 100% executed
         expect(heavy[:coverage_pct]).to eq(100.0)
-        expect(heavy[:executed_coverage_pct]).to eq(100.0) # all 3 lines have count >= 8
+        expect(heavy[:load_only_lines]).to eq(0)
+        expect(heavy[:testable_lines]).to eq(3)
+        expect(heavy[:executed_coverage_pct]).to eq(100.0)
       end
     end
   end

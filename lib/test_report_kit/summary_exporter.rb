@@ -43,6 +43,8 @@ module TestReportKit
         branch_coverage_pct: cov&.dig(:branch_coverage_pct),
         executed_coverage_pct: cov&.dig(:executed_coverage_pct),
         executed_lines: cov&.dig(:executed_lines),
+        load_only_lines: cov&.dig(:load_only_lines),
+        testable_lines: cov&.dig(:testable_lines),
         node_count: cov&.dig(:node_count),
 
         diff_coverage_pct: @diff_coverage&.diff_coverage_pct,

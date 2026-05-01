@@ -43,14 +43,15 @@ module TestReportKit
     def overall_coverage
       return nil unless @simplecov
 
-      total = covered = executed = branch_total = branch_covered = 0
+      total = covered = executed = load_only = branch_total = branch_covered = 0
 
       @simplecov.each_value do |data|
         lines = data.is_a?(Hash) ? data["lines"] : data
-        t, c, e = count_coverage(lines)
+        t, c, e, l = count_coverage(lines)
         total += t
         covered += c
         executed += e
+        load_only += l
 
         branches = data.is_a?(Hash) ? data.fetch("branches", {}) : {}
         branches.each_value do |branch_data|
@@ -61,31 +62,50 @@ module TestReportKit
         end
       end
 
+      testable = total - load_only
       pct = ->(c, t) { t > 0 ? (c.to_f / t * 100).round(1) : 0.0 }
       {
         total_lines: total, covered_lines: covered, missed_lines: total - covered,
         coverage_pct: pct[covered, total],
+        # "Executed" = lines a test actually exercised, computed against a denominator
+        # that excludes lines whose count equals the eager-load baseline (class
+        # declarations, `def foo` lines, validates, has_many, etc. — they execute once
+        # per process and physically can't go higher even when the surrounding methods
+        # are heavily tested).
         executed_lines: executed,
-        executed_coverage_pct: pct[executed, total],
+        load_only_lines: load_only,
+        testable_lines: testable,
+        executed_coverage_pct: pct[executed, testable],
         branch_total: branch_total, branch_covered: branch_covered,
         branch_coverage_pct: pct[branch_covered, branch_total],
         node_count: @node_count
       }
     end
 
-    # Returns [total_executable_lines, lines_with_count_>_0,
-    # lines_with_count_>_node_count]. The third value is the "executed" metric:
-    # lines whose count exceeds the eager-load baseline (one-per-process), so they
-    # were called by at least one test rather than only loaded.
+    # Returns [total_executable_lines, covered, executed, load_only].
+    #   total      = non-nil entries (everything except comments/blanks)
+    #   covered    = count > 0 (SimpleCov default semantics — matches Codecov)
+    #   executed   = count > 0 AND count != node_count
+    #                (line was test-called, in any number of shards, beyond the
+    #                 once-per-process eager-load baseline)
+    #   load_only  = count == node_count
+    #                (declarations and def lines that ran exactly once per shard
+    #                 from class loading and never from a test invocation)
     def count_coverage(lines_array)
-      total = covered = executed = 0
+      total = covered = executed = load_only = 0
       (lines_array || []).each do |count|
         next if count.nil?
         total += 1
-        covered += 1 if count > 0
-        executed += 1 if count > @node_count
+        next if count.zero?
+
+        covered += 1
+        if count == @node_count
+          load_only += 1
+        else
+          executed += 1
+        end
       end
-      [total, covered, executed]
+      [total, covered, executed, load_only]
     end
 
     # ── Per-file coverage ──
@@ -99,9 +119,10 @@ module TestReportKit
         lines = data.is_a?(Hash) ? data["lines"] : data
         relative = strip_to_relative(abs_path)
 
-        total, covered, executed = count_coverage(lines)
+        total, covered, executed, load_only = count_coverage(lines)
         cov_pct = total > 0 ? (covered.to_f / total * 100).round(1) : 0.0
-        exec_pct = total > 0 ? (executed.to_f / total * 100).round(1) : 0.0
+        testable = total - load_only
+        exec_pct = testable > 0 ? (executed.to_f / testable * 100).round(1) : 0.0
         churn = churn_files[relative] || 0
         risk = (churn * (100 - cov_pct)).round(0)
 
@@ -119,6 +140,8 @@ module TestReportKit
           missed_lines: total - covered,
           coverage_pct: cov_pct,
           executed_lines: executed,
+          load_only_lines: load_only,
+          testable_lines: testable,
           executed_coverage_pct: exec_pct,
           branch_coverage_pct: branch_pct,
           churn: churn,
