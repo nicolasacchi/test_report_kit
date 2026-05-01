@@ -193,7 +193,8 @@ module TestReportKit
         rspec_dissect_data: loader.rspec_dissect_data,
         git_churn_data: loader.git_churn_data,
         diff_coverage: diff_coverage,
-        config: @config
+        config: @config,
+        node_count: loader.node_count
       ).call
 
       md_exporter = MarkdownExporter.new(

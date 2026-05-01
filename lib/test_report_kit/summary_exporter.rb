@@ -41,6 +41,9 @@ module TestReportKit
         coverage_pct: cov&.dig(:coverage_pct),
         coverage_delta: delta,
         branch_coverage_pct: cov&.dig(:branch_coverage_pct),
+        executed_coverage_pct: cov&.dig(:executed_coverage_pct),
+        executed_lines: cov&.dig(:executed_lines),
+        node_count: cov&.dig(:node_count),
 
         diff_coverage_pct: @diff_coverage&.diff_coverage_pct,
         diff_coverage_passed: @diff_coverage&.passed,

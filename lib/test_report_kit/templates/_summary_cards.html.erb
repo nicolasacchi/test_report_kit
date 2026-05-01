@@ -22,7 +22,13 @@
     <div class="card-value" style="color: <%= coverage_color(overall_coverage[:coverage_pct]) %>;">
       <%= overall_coverage[:coverage_pct] %>%
     </div>
-    <div class="card-sub">branch: <%= overall_coverage[:branch_coverage_pct] %>% &middot; threshold: <%= @config.coverage_threshold %>%</div>
+    <div class="card-sub">
+      branch: <%= overall_coverage[:branch_coverage_pct] %>%
+      <% if overall_coverage[:executed_coverage_pct] -%>
+      &middot; <span title="Lines whose execution count exceeds the eager-load baseline (<%= overall_coverage[:node_count] %> per shard) — i.e. actually called by tests, not just by class loading.">executed: <%= overall_coverage[:executed_coverage_pct] %>%</span>
+      <% end -%>
+      &middot; threshold: <%= @config.coverage_threshold %>%
+    </div>
     <% else -%>
     <div class="card-value" style="color: var(--text-muted);">N/A</div>
     <div class="card-sub">no coverage data</div>

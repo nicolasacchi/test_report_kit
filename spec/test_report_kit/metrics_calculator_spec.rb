@@ -75,6 +75,74 @@ RSpec.describe TestReportKit::MetricsCalculator do
       )
       expect(calc.call[:overall_coverage]).to be_nil
     end
+
+    describe "executed coverage (load-only vs test-exercised)" do
+      # Three files. With node_count=1 ALL count==1 lines stay in `covered` (matches
+      # SimpleCov default) but ONLY count>=2 lines count as `executed`. With
+      # node_count=7, the threshold rises and the count==1 lines that were "executed"
+      # in the smaller-N case fall back below.
+      let(:simplecov_data) do
+        {
+          "/app/app/models/loaded_only.rb"  => { "lines" => [1, 1, 1, nil],   "branches" => {} },
+          "/app/app/models/half_exercised.rb" => { "lines" => [1, 5, nil, 0], "branches" => {} },
+          "/app/app/models/heavy.rb"          => { "lines" => [9, 12, nil, 8], "branches" => {} }
+        }
+      end
+
+      # Fixture has 9 executable lines (12 entries, 3 nil), 8 with count > 0:
+      #   loaded_only:    [1, 1, 1]     → 3 covered, 0 above 1, 0 above 7
+      #   half_exercised: [1, 5,    0]  → 2 covered, 1 above 1 (the 5), 0 above 7
+      #   heavy:          [9, 12,   8]  → 3 covered, 3 above 1, 3 above 7
+
+      it "with node_count=1, counts every count>1 line as executed" do
+        calc = described_class.new(
+          simplecov_data: simplecov_data, rspec_data: rspec_data,
+          factory_prof_data: factory_prof_data, event_prof_data: event_prof_data,
+          rspec_dissect_data: rspec_dissect_data, git_churn_data: git_churn_data,
+          diff_coverage: diff_coverage, config: config, node_count: 1
+        )
+        cov = calc.call[:overall_coverage]
+        expect(cov[:total_lines]).to eq(9)
+        expect(cov[:covered_lines]).to eq(8)
+        expect(cov[:coverage_pct]).to eq(88.9)
+        expect(cov[:executed_lines]).to eq(4) # 5, 9, 12, 8
+        expect(cov[:executed_coverage_pct]).to eq(44.4)
+        expect(cov[:node_count]).to eq(1)
+      end
+
+      it "with node_count=7, raises the threshold so count<=7 lines aren't executed" do
+        calc = described_class.new(
+          simplecov_data: simplecov_data, rspec_data: rspec_data,
+          factory_prof_data: factory_prof_data, event_prof_data: event_prof_data,
+          rspec_dissect_data: rspec_dissect_data, git_churn_data: git_churn_data,
+          diff_coverage: diff_coverage, config: config, node_count: 7
+        )
+        cov = calc.call[:overall_coverage]
+        # covered_lines unchanged (still uses count > 0)
+        expect(cov[:covered_lines]).to eq(8)
+        expect(cov[:coverage_pct]).to eq(88.9)
+        # Lines with count > 7: heavy[9, 12, 8] only = 3
+        expect(cov[:executed_lines]).to eq(3)
+        expect(cov[:executed_coverage_pct]).to eq(33.3)
+        expect(cov[:node_count]).to eq(7)
+      end
+
+      it "exposes per-file executed_coverage_pct in file_coverage_list" do
+        calc = described_class.new(
+          simplecov_data: simplecov_data, rspec_data: rspec_data,
+          factory_prof_data: factory_prof_data, event_prof_data: event_prof_data,
+          rspec_dissect_data: rspec_dissect_data, git_churn_data: git_churn_data,
+          diff_coverage: diff_coverage, config: config, node_count: 7
+        )
+        files = calc.call[:file_coverage]
+        loaded = files.find { |f| f[:path] == "app/models/loaded_only.rb" }
+        heavy  = files.find { |f| f[:path] == "app/models/heavy.rb" }
+        expect(loaded[:coverage_pct]).to eq(100.0)
+        expect(loaded[:executed_coverage_pct]).to eq(0.0)  # all 3 lines have count=1, none > 7
+        expect(heavy[:coverage_pct]).to eq(100.0)
+        expect(heavy[:executed_coverage_pct]).to eq(100.0) # all 3 lines have count >= 8
+      end
+    end
   end
 
   describe "file_coverage" do

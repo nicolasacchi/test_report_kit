@@ -4,7 +4,8 @@ module TestReportKit
   class MetricsCalculator
     def initialize(simplecov_data:, rspec_data:, factory_prof_data:,
                    event_prof_data:, rspec_dissect_data:, git_churn_data:,
-                   diff_coverage:, config: TestReportKit.configuration)
+                   diff_coverage:, config: TestReportKit.configuration,
+                   node_count: 1)
       @simplecov     = simplecov_data
       @rspec         = rspec_data
       @factory_prof  = factory_prof_data
@@ -13,6 +14,11 @@ module TestReportKit
       @git_churn     = git_churn_data
       @diff_coverage = diff_coverage
       @config        = config
+      # Threshold for the "executed" coverage metric. Lines whose merged execution
+      # count is `> @node_count` were called by tests beyond the once-per-shard
+      # baseline that eager-load contributes; lines `<= @node_count` only ran from
+      # class loading. Defaults to 1 so single-process runs use `count > 1`.
+      @node_count    = node_count.to_i.positive? ? node_count.to_i : 1
     end
 
     def call
@@ -37,13 +43,14 @@ module TestReportKit
     def overall_coverage
       return nil unless @simplecov
 
-      total = covered = branch_total = branch_covered = 0
+      total = covered = executed = branch_total = branch_covered = 0
 
       @simplecov.each_value do |data|
         lines = data.is_a?(Hash) ? data["lines"] : data
-        t, c = count_coverage(lines)
+        t, c, e = count_coverage(lines)
         total += t
         covered += c
+        executed += e
 
         branches = data.is_a?(Hash) ? data.fetch("branches", {}) : {}
         branches.each_value do |branch_data|
@@ -58,19 +65,27 @@ module TestReportKit
       {
         total_lines: total, covered_lines: covered, missed_lines: total - covered,
         coverage_pct: pct[covered, total],
+        executed_lines: executed,
+        executed_coverage_pct: pct[executed, total],
         branch_total: branch_total, branch_covered: branch_covered,
-        branch_coverage_pct: pct[branch_covered, branch_total]
+        branch_coverage_pct: pct[branch_covered, branch_total],
+        node_count: @node_count
       }
     end
 
+    # Returns [total_executable_lines, lines_with_count_>_0,
+    # lines_with_count_>_node_count]. The third value is the "executed" metric:
+    # lines whose count exceeds the eager-load baseline (one-per-process), so they
+    # were called by at least one test rather than only loaded.
     def count_coverage(lines_array)
-      total = covered = 0
+      total = covered = executed = 0
       (lines_array || []).each do |count|
         next if count.nil?
         total += 1
         covered += 1 if count > 0
+        executed += 1 if count > @node_count
       end
-      [total, covered]
+      [total, covered, executed]
     end
 
     # ── Per-file coverage ──
@@ -84,8 +99,9 @@ module TestReportKit
         lines = data.is_a?(Hash) ? data["lines"] : data
         relative = strip_to_relative(abs_path)
 
-        total, covered = count_coverage(lines)
+        total, covered, executed = count_coverage(lines)
         cov_pct = total > 0 ? (covered.to_f / total * 100).round(1) : 0.0
+        exec_pct = total > 0 ? (executed.to_f / total * 100).round(1) : 0.0
         churn = churn_files[relative] || 0
         risk = (churn * (100 - cov_pct)).round(0)
 
@@ -102,6 +118,8 @@ module TestReportKit
           covered_lines: covered,
           missed_lines: total - covered,
           coverage_pct: cov_pct,
+          executed_lines: executed,
+          executed_coverage_pct: exec_pct,
           branch_coverage_pct: branch_pct,
           churn: churn,
           risk_score: risk

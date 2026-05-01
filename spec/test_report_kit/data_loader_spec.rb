@@ -98,6 +98,42 @@ RSpec.describe TestReportKit::DataLoader do
         data = loader.simplecov_data["/app/models/user.rb"]
         expect(data["lines"]).to eq([1, 1, nil])
       end
+
+      it "exposes node_count = number of distinct commands in the resultset" do
+        loader.load_all
+        expect(loader.node_count).to eq(2)
+      end
+    end
+
+    describe "#node_count" do
+      it "defaults to 1 before any data loads" do
+        expect(loader.node_count).to eq(1)
+      end
+
+      it "stays at 1 for a single-command resultset (single-process run)" do
+        single = {
+          "RSpec" => {
+            "coverage" => { "/app/models/user.rb" => { "lines" => [1, nil], "branches" => {} } },
+            "timestamp" => 1
+          }
+        }
+        File.write(File.join(tmpdir, "coverage/.resultset.json"), JSON.generate(single))
+        loader.load_all
+        expect(loader.node_count).to eq(1)
+      end
+
+      it "matches the shard count for parallel-merged resultsets" do
+        merged = {}
+        3.times do |i|
+          merged["RSpec-#{i}-node#{i}"] = {
+            "coverage" => { "/app/models/user.rb" => { "lines" => [1, nil], "branches" => {} } },
+            "timestamp" => i
+          }
+        end
+        File.write(File.join(tmpdir, "coverage/.resultset.json"), JSON.generate(merged))
+        loader.load_all
+        expect(loader.node_count).to eq(3)
+      end
     end
   end
 

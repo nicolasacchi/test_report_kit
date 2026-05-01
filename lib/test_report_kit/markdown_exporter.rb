@@ -47,6 +47,9 @@ module TestReportKit
       lines << "|--------|-------|"
       if cov
         lines << "| Line Coverage | #{cov[:coverage_pct]}% (#{cov[:covered_lines]}/#{cov[:total_lines]}) |"
+        if cov[:executed_coverage_pct]
+          lines << "| Executed Coverage | #{cov[:executed_coverage_pct]}% (#{cov[:executed_lines]}/#{cov[:total_lines]}) — lines actually run by tests, beyond eager-load |"
+        end
         lines << "| Branch Coverage | #{cov[:branch_coverage_pct]}% |"
       end
       if rspec

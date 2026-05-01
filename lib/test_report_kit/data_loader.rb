@@ -6,10 +6,15 @@ module TestReportKit
   class DataLoader
     attr_reader :simplecov_data, :rspec_data, :factory_prof_data,
                 :event_prof_data, :rspec_dissect_data, :git_churn_data,
-                :resource_usage_data, :parallel_info_data
+                :resource_usage_data, :parallel_info_data,
+                :node_count
 
     def initialize(config: TestReportKit.configuration)
       @config = config
+      # Default to 1 (single-process); load_simplecov bumps it for parallel-merged
+      # resultsets so the "executed coverage" threshold can distinguish lines that
+      # only ran during eager-load from lines actually called by tests.
+      @node_count = 1
     end
 
     def load_all
@@ -31,6 +36,9 @@ module TestReportKit
       return nil unless File.exist?(path)
 
       raw = JSON.parse(File.read(path))
+      # One top-level key per SimpleCov command_name. Single-process runs have one
+      # ("RSpec"); ParallelMerger emits one per shard ("RSpec-0-node0", …).
+      @node_count = raw.size if raw.size.positive?
       merge_coverage_results(raw)
     rescue JSON::ParserError => e
       warn "TestReportKit: Failed to parse SimpleCov data: #{e.message}"
