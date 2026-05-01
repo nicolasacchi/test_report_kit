@@ -153,6 +153,22 @@
   .diff-line-code { padding: 2px 16px; }
   .diff-gap { height: 8px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface); }
 
+  /* Sortable column headers */
+  th[data-sort] { cursor: pointer; user-select: none; position: relative; padding-right: 18px !important; }
+  th[data-sort]:hover { color: var(--text-primary); }
+  th[data-sort]::after { content: '↕'; position: absolute; right: 6px; opacity: 0.25; font-size: 10px; transition: opacity 0.15s; }
+  th[data-sort]:hover::after { opacity: 0.6; }
+  th[data-sort].sorted-asc::after  { content: '↑'; opacity: 1; color: var(--accent); }
+  th[data-sort].sorted-desc::after { content: '↓'; opacity: 1; color: var(--accent); }
+
+  /* Code viewer filter bar */
+  .cov-filter-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); font-size: 11px; flex-wrap: wrap; }
+  .cov-filter-bar .cov-filter-btn { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); font-family: var(--mono); font-size: 11px; padding: 3px 10px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+  .cov-filter-bar .cov-filter-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+  .cov-filter-bar .cov-filter-btn.active { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .cov-filter-bar label { display: flex; align-items: center; gap: 4px; color: var(--text-muted); cursor: pointer; margin-left: auto; }
+  .cov-filter-bar .cov-count { color: var(--text-muted); font-size: 10px; }
+
   .file-viewer { max-height: 500px; overflow-y: auto; }
   .cov-line { display: flex; font-family: var(--mono); font-size: 12px; line-height: 1.8; border-bottom: 1px solid var(--border-subtle); }
   .cov-line-num { display: block; width: 44px; text-align: right; padding: 1px 8px 1px 0; flex-shrink: 0; user-select: none; text-decoration: none; color: inherit; font: inherit; }
@@ -162,6 +178,10 @@
   .cov-line-covered { background: rgba(34, 197, 94, 0.04); }
   .cov-line-covered .cov-line-num { color: var(--text-muted); border-right: 3px solid rgba(34, 197, 94, 0.3); }
   .cov-line-covered .cov-line-hits { color: var(--green); }
+  .cov-line-load-only { background: rgba(245, 158, 11, 0.06); }
+  .cov-line-load-only .cov-line-num { border-right-color: rgba(245, 158, 11, 0.5); }
+  .cov-line-load-only .cov-line-hits { color: var(--orange); }
+  .cov-line-executed { background: rgba(34, 197, 94, 0.08); }
   .cov-line-uncovered { background: rgba(239, 68, 68, 0.06); }
   .cov-line-uncovered .cov-line-num { color: var(--red); border-right: 3px solid var(--red); font-weight: 600; }
   .cov-line-uncovered .cov-line-hits { color: var(--red); font-weight: 600; }
@@ -270,29 +290,52 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // Table sorting (skips detail rows)
+//
+// Sort key resolution per cell:
+//   1. data-sort-value attribute (set by templates for explicit numeric values)
+//   2. fall back to textContent
+// Then numeric vs string detection: a value is numeric only if its trimmed form
+// matches a strict number pattern (optional minus, digits, optional decimal). This
+// avoids the previous bug where filenames like "user_v1.rb" sorted numerically.
+//
+// Per-column type can be pinned with data-sort="text"|"num" on the <th>; default is auto.
+function trkSortValue(cell) {
+  if (!cell) return '';
+  if (cell.dataset && cell.dataset.sortValue !== undefined) return cell.dataset.sortValue;
+  return cell.textContent.trim();
+}
+
+function trkCompare(a, b, asc, type) {
+  const numRe = /^-?\d+(\.\d+)?$/;
+  let useNum;
+  if (type === 'num')       useNum = true;
+  else if (type === 'text') useNum = false;
+  else                       useNum = numRe.test(a) && numRe.test(b);
+  if (useNum) {
+    const an = parseFloat(a), bn = parseFloat(b);
+    if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
+  }
+  return asc ? a.localeCompare(b, undefined, { numeric: false, sensitivity: 'base' })
+             : b.localeCompare(a, undefined, { numeric: false, sensitivity: 'base' });
+}
+
 document.querySelectorAll('th[data-sort]').forEach(th => {
   th.addEventListener('click', function() {
     const table = this.closest('table');
     const tbody = table.querySelector('tbody');
-    // Only sort primary rows, not detail/expand rows
-    const rows = Array.from(tbody.querySelectorAll('tr:not(.cov-file-detail)'));
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr:not(.cov-file-detail):not(.failure-detail):not(.perf-test-detail):not(.factory-detail)'));
     const idx = Array.from(this.parentNode.children).indexOf(this);
     const asc = !this.classList.contains('sorted-asc');
+    const type = this.getAttribute('data-sort');
     this.parentNode.querySelectorAll('th').forEach(h => h.classList.remove('sorted', 'sorted-asc', 'sorted-desc'));
     this.classList.add('sorted', asc ? 'sorted-asc' : 'sorted-desc');
-    rows.sort((a, b) => {
-      const aVal = a.children[idx]?.textContent.trim() || '';
-      const bVal = b.children[idx]?.textContent.trim() || '';
-      const aNum = parseFloat(aVal.replace(/[^0-9.\-]/g, ''));
-      const bNum = parseFloat(bVal.replace(/[^0-9.\-]/g, ''));
-      if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
-      return asc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-    });
-    // Re-append each row followed by its detail row
+    rows.sort((a, b) => trkCompare(trkSortValue(a.children[idx]), trkSortValue(b.children[idx]), asc, type));
+    // Re-append each row followed by its detail row (preserve any expandable pair)
     rows.forEach(row => {
       tbody.appendChild(row);
       const detail = row.nextElementSibling;
-      if (detail?.classList.contains('cov-file-detail')) tbody.appendChild(detail);
+      if (detail && /^(cov-file|failure|perf-test|factory)-detail$/.test(detail.className)) tbody.appendChild(detail);
     });
   });
 });
@@ -372,28 +415,55 @@ if (hideFullCov) {
 
   // Builds coverage viewer HTML from trusted JSON data (generated by test_report_kit).
   // All text content is escaped via escHtml() before insertion.
+  // Each line is tagged with classes the filter bar uses to show/hide:
+  //   cov-line-none       — comment / blank / non-executable (cov === null)
+  //   cov-line-uncovered  — count === 0
+  //   cov-line-covered    — count > 0, plus one of:
+  //     cov-line-load-only — count === threshold (loaded but not test-called)
+  //     cov-line-executed  — count > 0 and count !== threshold
   function buildViewer(path) {
     var d = covFileData[path];
     if (!d) return null;
-    var h = '<div class="file-viewer">';
+    var threshold = d.threshold || 1;
+    var counts = { none: 0, uncovered: 0, loadOnly: 0, executed: 0, total: d.lines.length };
+    var rows = '<div class="file-viewer">';
     for (var i = 0; i < d.lines.length; i++) {
       var ex = d.cov[i], cls;
-      if (ex === null || ex === undefined) cls = 'cov-line cov-line-none';
-      else if (ex > 0) cls = 'cov-line cov-line-covered';
-      else cls = 'cov-line cov-line-uncovered';
-      h += '<div class="'+cls+'">';
+      if (ex === null || ex === undefined) {
+        cls = 'cov-line cov-line-none';
+        counts.none++;
+      } else if (ex === 0) {
+        cls = 'cov-line cov-line-uncovered';
+        counts.uncovered++;
+      } else if (ex === threshold) {
+        cls = 'cov-line cov-line-covered cov-line-load-only';
+        counts.loadOnly++;
+      } else {
+        cls = 'cov-line cov-line-covered cov-line-executed';
+        counts.executed++;
+      }
+      rows += '<div class="'+cls+'">';
       var ln = i+1;
       if (covConfig.github_url) {
-        h += '<a href="'+escHtml(covConfig.github_url)+'/blob/'+covConfig.sha+'/'+path+'#L'+ln+'" target="_blank" rel="noopener" class="cov-line-num">'+ln+'</a>';
+        rows += '<a href="'+escHtml(covConfig.github_url)+'/blob/'+covConfig.sha+'/'+path+'#L'+ln+'" target="_blank" rel="noopener" class="cov-line-num">'+ln+'</a>';
       } else {
-        h += '<div class="cov-line-num">'+ln+'</div>';
+        rows += '<div class="cov-line-num">'+ln+'</div>';
       }
-      h += '<div class="cov-line-hits">'+(ex!==null&&ex!==undefined?ex+'x':'')+'</div>';
-      h += '<div class="cov-line-code">'+highlightRuby(d.lines[i])+'</div>';
-      h += '</div>';
+      rows += '<div class="cov-line-hits">'+(ex!==null&&ex!==undefined?ex+'x':'')+'</div>';
+      rows += '<div class="cov-line-code">'+highlightRuby(d.lines[i])+'</div>';
+      rows += '</div>';
     }
-    h += '</div>';
-    return h;
+    rows += '</div>';
+
+    var bar = '<div class="cov-filter-bar">';
+    bar += '<button type="button" class="cov-filter-btn active" data-cov-filter="all">All <span class="cov-count">('+(counts.uncovered+counts.loadOnly+counts.executed)+')</span></button>';
+    bar += '<button type="button" class="cov-filter-btn" data-cov-filter="uncovered">Uncovered <span class="cov-count">('+counts.uncovered+')</span></button>';
+    bar += '<button type="button" class="cov-filter-btn" data-cov-filter="executed">Executed <span class="cov-count">('+counts.executed+')</span></button>';
+    bar += '<button type="button" class="cov-filter-btn" data-cov-filter="load-only">Load-only <span class="cov-count">('+counts.loadOnly+')</span></button>';
+    bar += '<label><input type="checkbox" data-cov-hide-blanks checked> hide comments &amp; blanks</label>';
+    bar += '</div>';
+
+    return bar + rows;
   }
 
   document.querySelectorAll('.cov-file-row').forEach(function(row) {
@@ -409,13 +479,55 @@ if (hideFullCov) {
       var tr = document.createElement('tr');
       tr.className = 'cov-file-detail';
       var td = document.createElement('td');
-      td.setAttribute('colspan','6');
+      td.setAttribute('colspan','7');
       td.style.padding = '0';
       // Data source is trusted (self-generated JSON with escHtml applied to all text)
       td.innerHTML = viewerHtml;
       tr.appendChild(td);
       this.parentNode.insertBefore(tr, this.nextSibling);
+      applyLineFilters(td);
     });
+  });
+
+  // Apply current filter state inside a viewer container. Driven by the active
+  // category button and the "hide comments & blanks" checkbox in the filter bar.
+  function applyLineFilters(container) {
+    var bar = container.querySelector('.cov-filter-bar');
+    if (!bar) return;
+    var active = bar.querySelector('.cov-filter-btn.active');
+    var category = active ? active.getAttribute('data-cov-filter') : 'all';
+    var hideBlanks = bar.querySelector('input[data-cov-hide-blanks]').checked;
+    container.querySelectorAll('.cov-line').forEach(function(line) {
+      var isNone     = line.classList.contains('cov-line-none');
+      var isUncov    = line.classList.contains('cov-line-uncovered');
+      var isLoadOnly = line.classList.contains('cov-line-load-only');
+      var isExec     = line.classList.contains('cov-line-executed');
+      var match = false;
+      switch (category) {
+        case 'all':       match = !(hideBlanks && isNone); break;
+        case 'uncovered': match = isUncov; break;
+        case 'executed':  match = isExec; break;
+        case 'load-only': match = isLoadOnly; break;
+      }
+      line.style.display = match ? '' : 'none';
+    });
+  }
+
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.cov-filter-btn');
+    if (!btn) return;
+    var bar = btn.closest('.cov-filter-bar');
+    if (!bar) return;
+    bar.querySelectorAll('.cov-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    applyLineFilters(bar.parentElement);
+  });
+
+  document.addEventListener('change', function(e) {
+    if (!e.target.matches('input[data-cov-hide-blanks]')) return;
+    var bar = e.target.closest('.cov-filter-bar');
+    if (!bar) return;
+    applyLineFilters(bar.parentElement);
   });
 })();
 

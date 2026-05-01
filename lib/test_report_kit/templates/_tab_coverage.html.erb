@@ -17,28 +17,36 @@
   <table>
     <thead>
       <tr>
-        <th data-sort>File</th>
-        <th data-sort>Line Cov</th>
-        <th data-sort>Branch Cov</th>
-        <th data-sort>Uncovered</th>
-        <th data-sort>Churn (90d)</th>
-        <th data-sort>Risk</th>
+        <th data-sort="text">File</th>
+        <th data-sort="num">Line Cov</th>
+        <th data-sort="num">Executed</th>
+        <th data-sort="num">Branch Cov</th>
+        <th data-sort="num">Uncovered</th>
+        <th data-sort="num">Churn (90d)</th>
+        <th data-sort="num">Risk</th>
       </tr>
     </thead>
     <tbody>
       <% file_coverage.each do |f| -%>
       <tr class="cov-file-row" data-cov-pct="<%= f[:coverage_pct] %>" data-path="<%= h(f[:path]) %>"<%= f[:coverage_pct] >= 100 ? ' style="display:none;"' : '' %>>
-        <td><div class="file-path"><%= file_link(f[:path]) %></div></td>
-        <td>
+        <td data-sort-value="<%= h(f[:path]) %>"><div class="file-path"><%= file_link(f[:path]) %></div></td>
+        <td data-sort-value="<%= f[:coverage_pct] %>">
           <div class="cov-bar">
             <div class="cov-bar-track"><div class="cov-bar-fill" style="width:<%= f[:coverage_pct] %>%; background: <%= coverage_color(f[:coverage_pct]) %>;"></div></div>
             <span class="cov-pct" style="color: <%= coverage_color(f[:coverage_pct]) %>;"><%= f[:coverage_pct] %>%</span>
           </div>
         </td>
-        <td><span class="num" style="color: <%= f[:branch_coverage_pct] ? coverage_color(f[:branch_coverage_pct]) : 'var(--text-muted)' %>;"><%= f[:branch_coverage_pct] ? "#{f[:branch_coverage_pct]}%" : "—" %></span></td>
-        <td><span class="num"><%= f[:missed_lines] %></span></td>
-        <td><span class="num"><%= f[:churn] %></span></td>
-        <td><span class="risk-score" style="background: <%= risk_bg(f[:risk_score]) %>; color: <%= risk_color(f[:risk_score]) %>;"><%= f[:risk_score] %></span></td>
+        <td data-sort-value="<%= f[:executed_coverage_pct] || -1 %>">
+          <% if f[:testable_lines] && f[:testable_lines] > 0 -%>
+            <span class="num" style="color: <%= coverage_color(f[:executed_coverage_pct]) %>;" title="<%= f[:executed_lines] %> of <%= f[:testable_lines] %> testable lines exercised by tests"><%= f[:executed_coverage_pct] %>%</span>
+          <% else -%>
+            <span class="num" style="color: var(--text-muted);" title="all lines are load-only declarations — nothing testable in this file">—</span>
+          <% end -%>
+        </td>
+        <td data-sort-value="<%= f[:branch_coverage_pct] || -1 %>"><span class="num" style="color: <%= f[:branch_coverage_pct] ? coverage_color(f[:branch_coverage_pct]) : 'var(--text-muted)' %>;"><%= f[:branch_coverage_pct] ? "#{f[:branch_coverage_pct]}%" : "—" %></span></td>
+        <td data-sort-value="<%= f[:missed_lines] %>"><span class="num"><%= f[:missed_lines] %></span></td>
+        <td data-sort-value="<%= f[:churn] %>"><span class="num"><%= f[:churn] %></span></td>
+        <td data-sort-value="<%= f[:risk_score] %>"><span class="risk-score" style="background: <%= risk_bg(f[:risk_score]) %>; color: <%= risk_color(f[:risk_score]) %>;"><%= f[:risk_score] %></span></td>
       </tr>
       <% end -%>
     </tbody>

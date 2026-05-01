@@ -6,26 +6,27 @@
     <div style="display: flex; align-items: center; gap: 12px;">
       <span style="font-size: 11px; color: var(--text-muted);">click a factory to view details</span>
       <span style="font-size: 11px; color: var(--text-muted); font-family: var(--mono);"><%= format_number(factory_health[:total_count]) %> total creates &middot; <%= factory_health[:total_time] %></span>
+      <input type="text" class="table-filter" placeholder="filter factories...">
     </div>
   </div>
   <table>
     <thead>
       <tr>
-        <th data-sort>Factory</th>
-        <th data-sort>Creates</th>
-        <th data-sort>Top-Level</th>
-        <th data-sort>Cascade Ratio</th>
-        <th data-sort>Time</th>
+        <th data-sort="text">Factory</th>
+        <th data-sort="num">Creates</th>
+        <th data-sort="num">Top-Level</th>
+        <th data-sort="num">Cascade Ratio</th>
+        <th data-sort="num">Time</th>
       </tr>
     </thead>
     <tbody>
       <% factory_health[:stats].each do |s| -%>
       <tr class="factory-row" style="cursor: pointer;">
-        <td><span class="num" style="color: var(--cyan); font-weight: 600;">:<%= h(s[:name]) %></span><%= factory_file_link(s[:name]) %></td>
-        <td><span class="num" style="color: <%= s[:total_count] >= 1000 ? 'var(--red)' : s[:total_count] >= 500 ? 'var(--orange)' : 'var(--text-secondary)' %>; font-weight: 700;"><%= format_number(s[:total_count]) %></span></td>
-        <td><span class="num"><%= format_number(s[:top_level_count]) %></span></td>
-        <td><span class="risk-score" style="background: <%= s[:cascade_ratio] >= 5 ? 'var(--red-dim)' : s[:cascade_ratio] >= 3 ? 'var(--yellow-dim)' : 'var(--green-dim)' %>; color: <%= s[:cascade_ratio] >= 5 ? 'var(--red)' : s[:cascade_ratio] >= 3 ? 'var(--yellow)' : 'var(--green)' %>;"><%= s[:cascade_ratio] %>x</span></td>
-        <td><span class="num"><%= s[:total_time].is_a?(Numeric) ? "#{s[:total_time].round(1)}s" : s[:total_time] %></span></td>
+        <td data-sort-value="<%= h(s[:name].to_s) %>"><span class="num" style="color: var(--cyan); font-weight: 600;">:<%= h(s[:name]) %></span><%= factory_file_link(s[:name]) %></td>
+        <td data-sort-value="<%= s[:total_count] %>"><span class="num" style="color: <%= s[:total_count] >= 1000 ? 'var(--red)' : s[:total_count] >= 500 ? 'var(--orange)' : 'var(--text-secondary)' %>; font-weight: 700;"><%= format_number(s[:total_count]) %></span></td>
+        <td data-sort-value="<%= s[:top_level_count] %>"><span class="num"><%= format_number(s[:top_level_count]) %></span></td>
+        <td data-sort-value="<%= s[:cascade_ratio] %>"><span class="risk-score" style="background: <%= s[:cascade_ratio] >= 5 ? 'var(--red-dim)' : s[:cascade_ratio] >= 3 ? 'var(--yellow-dim)' : 'var(--green-dim)' %>; color: <%= s[:cascade_ratio] >= 5 ? 'var(--red)' : s[:cascade_ratio] >= 3 ? 'var(--yellow)' : 'var(--green)' %>;"><%= s[:cascade_ratio] %>x</span></td>
+        <td data-sort-value="<%= s[:total_time].is_a?(Numeric) ? s[:total_time] : 0 %>"><span class="num"><%= s[:total_time].is_a?(Numeric) ? "#{s[:total_time].round(1)}s" : s[:total_time] %></span></td>
       </tr>
       <tr class="factory-detail" style="display:none;">
         <td colspan="5" style="padding: 0;">

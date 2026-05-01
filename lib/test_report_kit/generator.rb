@@ -274,6 +274,9 @@ module TestReportKit
     def coverage_file_data_json
       return "{}" unless @data_loader.simplecov_data
 
+      load_counts = @data_loader.respond_to?(:file_load_counts) ? @data_loader.file_load_counts : {}
+      global_node_count = @data_loader.respond_to?(:node_count) ? @data_loader.node_count : 1
+
       result = {}
       file_coverage.each do |f|
         next if f[:coverage_pct] >= 100
@@ -284,9 +287,16 @@ module TestReportKit
         source_path = File.join(@config.project_root, f[:path])
         next unless File.exist?(source_path)
 
+        abs_path = File.join(@config.project_root, f[:path])
+        threshold = load_counts[abs_path] || global_node_count
+
         result[f[:path]] = {
           lines: File.readlines(source_path, chomp: true),
-          cov: line_data
+          cov: line_data,
+          # Per-file load baseline. Lines whose count equals this number are "load-only"
+          # (executed exactly once per shard from class loading). Used by the line-filter
+          # buttons in the code viewer.
+          threshold: threshold
         }
       end
 
@@ -294,7 +304,8 @@ module TestReportKit
     end
 
     def coverage_config_json
-      { github_url: @config.github_url, sha: sha }.to_json
+      node_count = @data_loader.respond_to?(:node_count) ? @data_loader.node_count : 1
+      { github_url: @config.github_url, sha: sha, node_count: node_count }.to_json
     end
 
     def all_passing?

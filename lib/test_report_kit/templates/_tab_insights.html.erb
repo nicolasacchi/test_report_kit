@@ -10,19 +10,19 @@
   <table>
     <thead>
       <tr>
-        <th>File</th>
-        <th data-sort>Coverage</th>
-        <th data-sort>Churn</th>
-        <th data-sort>Risk Score</th>
+        <th data-sort="text">File</th>
+        <th data-sort="num">Coverage</th>
+        <th data-sort="num">Churn</th>
+        <th data-sort="num">Risk Score</th>
       </tr>
     </thead>
     <tbody>
       <% insights[:high_risk].each do |f| -%>
       <tr>
-        <td><span class="file-path"><%= file_link(f[:path]) %></span></td>
-        <td><span class="num" style="color: <%= coverage_color(f[:coverage_pct]) %>;"><%= f[:coverage_pct] %>%</span></td>
-        <td><span class="num"><%= f[:churn] %> commits</span></td>
-        <td><span class="risk-score" style="background: <%= risk_bg(f[:risk_score]) %>; color: <%= risk_color(f[:risk_score]) %>;"><%= f[:risk_score] %></span></td>
+        <td data-sort-value="<%= h(f[:path].to_s) %>"><span class="file-path"><%= file_link(f[:path]) %></span></td>
+        <td data-sort-value="<%= f[:coverage_pct] %>"><span class="num" style="color: <%= coverage_color(f[:coverage_pct]) %>;"><%= f[:coverage_pct] %>%</span></td>
+        <td data-sort-value="<%= f[:churn] %>"><span class="num"><%= f[:churn] %> commits</span></td>
+        <td data-sort-value="<%= f[:risk_score] %>"><span class="risk-score" style="background: <%= risk_bg(f[:risk_score]) %>; color: <%= risk_color(f[:risk_score]) %>;"><%= f[:risk_score] %></span></td>
       </tr>
       <% end -%>
     </tbody>
@@ -44,17 +44,17 @@
   <table>
     <thead>
       <tr>
-        <th>File</th>
-        <th data-sort>Coverage</th>
-        <th data-sort>Total Test Time</th>
+        <th data-sort="text">File</th>
+        <th data-sort="num">Coverage</th>
+        <th data-sort="num">Total Test Time</th>
       </tr>
     </thead>
     <tbody>
       <% insights[:over_tested].each do |f| -%>
       <tr>
-        <td><span class="file-path"><%= file_link(f[:path]) %></span></td>
-        <td><span class="num" style="color: var(--green);"><%= f[:coverage_pct] %>%</span></td>
-        <td><span class="num" style="color: var(--red);"><%= f[:total_test_time] %>s</span></td>
+        <td data-sort-value="<%= h(f[:path].to_s) %>"><span class="file-path"><%= file_link(f[:path]) %></span></td>
+        <td data-sort-value="<%= f[:coverage_pct] %>"><span class="num" style="color: var(--green);"><%= f[:coverage_pct] %>%</span></td>
+        <td data-sort-value="<%= f[:total_test_time] %>"><span class="num" style="color: var(--red);"><%= f[:total_test_time] %>s</span></td>
       </tr>
       <% end -%>
     </tbody>
@@ -76,21 +76,21 @@
   <table>
     <thead>
       <tr>
-        <th>File</th>
-        <th>Total Time</th>
-        <th>Hook Time</th>
-        <th>Example Time</th>
-        <th data-sort>Hook %</th>
+        <th data-sort="text">File</th>
+        <th data-sort="text">Total Time</th>
+        <th data-sort="text">Hook Time</th>
+        <th data-sort="text">Example Time</th>
+        <th data-sort="num">Hook %</th>
       </tr>
     </thead>
     <tbody>
       <% insights[:false_security].each do |f| -%>
       <tr>
-        <td><span class="file-path"><% loc_p = f[:location].to_s.sub('./', '').split(':'); %><%= file_link(loc_p[0], line: loc_p[1]&.to_i) %></span></td>
+        <td data-sort-value="<%= h(f[:location].to_s) %>"><span class="file-path"><% loc_p = f[:location].to_s.sub('./', '').split(':'); %><%= file_link(loc_p[0], line: loc_p[1]&.to_i) %></span></td>
         <td><span class="num"><%= f[:total_time] %></span></td>
         <td><span class="num" style="color: var(--red);"><%= f[:hook_time] %></span></td>
         <td><span class="num" style="color: var(--green);"><%= f[:example_time] %></span></td>
-        <td><span class="risk-score" style="background: <%= f[:hook_pct] >= 70 ? 'var(--red-dim)' : 'var(--yellow-dim)' %>; color: <%= f[:hook_pct] >= 70 ? 'var(--red)' : 'var(--yellow)' %>;"><%= f[:hook_pct] %>%</span></td>
+        <td data-sort-value="<%= f[:hook_pct] %>"><span class="risk-score" style="background: <%= f[:hook_pct] >= 70 ? 'var(--red-dim)' : 'var(--yellow-dim)' %>; color: <%= f[:hook_pct] >= 70 ? 'var(--red)' : 'var(--yellow)' %>;"><%= f[:hook_pct] %>%</span></td>
       </tr>
       <% end -%>
     </tbody>
@@ -112,15 +112,15 @@
   <table>
     <thead>
       <tr>
-        <th>File</th>
-        <th data-sort>Churn</th>
+        <th data-sort="text">File</th>
+        <th data-sort="num">Churn</th>
       </tr>
     </thead>
     <tbody>
       <% insights[:untested_hot_paths].each do |f| -%>
       <tr>
-        <td><span class="file-path"><%= file_link(f[:path]) %></span></td>
-        <td><span class="num" style="color: var(--red);"><%= f[:churn] %> commits</span></td>
+        <td data-sort-value="<%= h(f[:path].to_s) %>"><span class="file-path"><%= file_link(f[:path]) %></span></td>
+        <td data-sort-value="<%= f[:churn] %>"><span class="num" style="color: var(--red);"><%= f[:churn] %> commits</span></td>
       </tr>
       <% end -%>
     </tbody>
