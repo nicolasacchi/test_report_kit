@@ -7,7 +7,7 @@ module TestReportKit
     attr_reader :simplecov_data, :rspec_data, :factory_prof_data,
                 :event_prof_data, :rspec_dissect_data, :git_churn_data,
                 :resource_usage_data, :parallel_info_data,
-                :node_count
+                :node_count, :file_load_counts
 
     def initialize(config: TestReportKit.configuration)
       @config = config
@@ -15,6 +15,10 @@ module TestReportKit
       # resultsets so the "executed coverage" threshold can distinguish lines that
       # only ran during eager-load from lines actually called by tests.
       @node_count = 1
+      # Per-file load count = how many distinct SimpleCov commands had this file in
+      # their coverage. Equals @node_count for files loaded in every shard (the
+      # common eager_load=true case); smaller for files only some shards required.
+      @file_load_counts = {}
     end
 
     def load_all
@@ -38,20 +42,30 @@ module TestReportKit
       raw = JSON.parse(File.read(path))
       # One top-level key per SimpleCov command_name. Single-process runs have one
       # ("RSpec"); ParallelMerger emits one per shard ("RSpec-0-node0", …).
-      @node_count = raw.size if raw.size.positive?
+      @node_count = config_override_node_count || (raw.size.positive? ? raw.size : 1)
       merge_coverage_results(raw)
     rescue JSON::ParserError => e
       warn "TestReportKit: Failed to parse SimpleCov data: #{e.message}"
       nil
     end
 
+    def config_override_node_count
+      return nil unless @config.respond_to?(:simplecov_node_count_override)
+
+      override = @config.simplecov_node_count_override
+      return nil if override.nil?
+      override.to_i.positive? ? override.to_i : nil
+    end
+
     def merge_coverage_results(raw)
       merged = {}
+      load_counts = Hash.new(0)
 
       raw.each do |_command_name, command_data|
         next unless command_data.is_a?(Hash) && command_data["coverage"]
 
         command_data["coverage"].each do |filename, data|
+          load_counts[filename] += 1
           normalized = normalize_file_coverage(data)
           if merged[filename]
             merged[filename] = merge_file_coverage(merged[filename], normalized)
@@ -61,6 +75,7 @@ module TestReportKit
         end
       end
 
+      @file_load_counts = load_counts
       merged
     end
 

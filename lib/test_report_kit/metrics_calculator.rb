@@ -5,7 +5,7 @@ module TestReportKit
     def initialize(simplecov_data:, rspec_data:, factory_prof_data:,
                    event_prof_data:, rspec_dissect_data:, git_churn_data:,
                    diff_coverage:, config: TestReportKit.configuration,
-                   node_count: 1)
+                   node_count: 1, file_load_counts: {})
       @simplecov     = simplecov_data
       @rspec         = rspec_data
       @factory_prof  = factory_prof_data
@@ -14,11 +14,14 @@ module TestReportKit
       @git_churn     = git_churn_data
       @diff_coverage = diff_coverage
       @config        = config
-      # Threshold for the "executed" coverage metric. Lines whose merged execution
-      # count is `> @node_count` were called by tests beyond the once-per-shard
-      # baseline that eager-load contributes; lines `<= @node_count` only ran from
-      # class loading. Defaults to 1 so single-process runs use `count > 1`.
+      # Global "load baseline" — number of SimpleCov commands in the resultset.
+      # Used as a fallback when a file's per-shard presence isn't known.
       @node_count    = node_count.to_i.positive? ? node_count.to_i : 1
+      # Per-file load count: how many shards' coverage data contained the file. A
+      # line whose count equals its file's load count ran exactly once per shard
+      # from class loading and never from a test invocation — that's "load_only".
+      # Falls back to @node_count when a file isn't in the map.
+      @file_load_counts = file_load_counts || {}
     end
 
     def call
@@ -45,9 +48,10 @@ module TestReportKit
 
       total = covered = executed = load_only = branch_total = branch_covered = 0
 
-      @simplecov.each_value do |data|
+      @simplecov.each do |path, data|
         lines = data.is_a?(Hash) ? data["lines"] : data
-        t, c, e, l = count_coverage(lines)
+        threshold = load_threshold_for(path)
+        t, c, e, l = count_coverage(lines, threshold)
         total += t
         covered += c
         executed += e
@@ -85,13 +89,15 @@ module TestReportKit
     # Returns [total_executable_lines, covered, executed, load_only].
     #   total      = non-nil entries (everything except comments/blanks)
     #   covered    = count > 0 (SimpleCov default semantics — matches Codecov)
-    #   executed   = count > 0 AND count != node_count
+    #   executed   = count > 0 AND count != threshold
     #                (line was test-called, in any number of shards, beyond the
-    #                 once-per-process eager-load baseline)
-    #   load_only  = count == node_count
+    #                 once-per-shard eager-load baseline)
+    #   load_only  = count == threshold
     #                (declarations and def lines that ran exactly once per shard
     #                 from class loading and never from a test invocation)
-    def count_coverage(lines_array)
+    # `threshold` is the per-file load count when known, falling back to the
+    # global `@node_count`.
+    def count_coverage(lines_array, threshold = @node_count)
       total = covered = executed = load_only = 0
       (lines_array || []).each do |count|
         next if count.nil?
@@ -99,13 +105,24 @@ module TestReportKit
         next if count.zero?
 
         covered += 1
-        if count == @node_count
+        if count == threshold
           load_only += 1
         else
           executed += 1
         end
       end
       [total, covered, executed, load_only]
+    end
+
+    # Per-file load count: how many distinct SimpleCov commands had this file in
+    # their coverage data. Lines whose count equals this number ran exactly once
+    # per shard from class loading and never from a test call. When unknown
+    # (mostly when MetricsCalculator is instantiated without the DataLoader's
+    # file_load_counts hash, e.g., in older callers or unit tests), we fall back
+    # to the global @node_count.
+    def load_threshold_for(path)
+      n = @file_load_counts[path]
+      n.is_a?(Integer) && n.positive? ? n : @node_count
     end
 
     # ── Per-file coverage ──
@@ -119,7 +136,8 @@ module TestReportKit
         lines = data.is_a?(Hash) ? data["lines"] : data
         relative = strip_to_relative(abs_path)
 
-        total, covered, executed, load_only = count_coverage(lines)
+        threshold = load_threshold_for(abs_path)
+        total, covered, executed, load_only = count_coverage(lines, threshold)
         cov_pct = total > 0 ? (covered.to_f / total * 100).round(1) : 0.0
         testable = total - load_only
         exec_pct = testable > 0 ? (executed.to_f / testable * 100).round(1) : 0.0

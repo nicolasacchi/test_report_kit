@@ -162,6 +162,34 @@ RSpec.describe TestReportKit::MetricsCalculator do
         expect(heavy[:testable_lines]).to eq(3)
         expect(heavy[:executed_coverage_pct]).to eq(100.0)
       end
+
+      it "uses per-file load thresholds when file_load_counts is provided" do
+        # heavy.rb is in 3 shards (load count 3); loaded_only.rb is in 7 shards (load
+        # count 7). With global node_count=7 alone, heavy.rb's [9, 12, 8] would be
+        # mis-classified — but those values exceed both thresholds so they stay
+        # `executed`. The discriminating case: a class-body line in heavy.rb at
+        # count==3 should be load-only (matches its file's threshold), NOT executed.
+        simplecov = {
+          "/app/app/models/loaded_only.rb" => { "lines" => [7, 7, 7, nil],   "branches" => {} },
+          "/app/app/models/heavy.rb"       => { "lines" => [3, 12, nil, 8], "branches" => {} }
+        }
+        calc = described_class.new(
+          simplecov_data: simplecov, rspec_data: rspec_data,
+          factory_prof_data: factory_prof_data, event_prof_data: event_prof_data,
+          rspec_dissect_data: rspec_dissect_data, git_churn_data: git_churn_data,
+          diff_coverage: diff_coverage, config: config,
+          node_count: 7,
+          file_load_counts: {
+            "/app/app/models/loaded_only.rb" => 7,
+            "/app/app/models/heavy.rb"       => 3
+          }
+        )
+        cov = calc.call[:overall_coverage]
+        # loaded_only: 3 × count==7 (its threshold) → 3 load_only
+        # heavy:       count==3 (its threshold) is load_only; 12 and 8 are executed
+        expect(cov[:load_only_lines]).to eq(4) # 3 + 1
+        expect(cov[:executed_lines]).to eq(2)  # 12, 8
+      end
     end
   end
 

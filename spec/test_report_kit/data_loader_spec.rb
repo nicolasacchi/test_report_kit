@@ -134,6 +134,45 @@ RSpec.describe TestReportKit::DataLoader do
         loader.load_all
         expect(loader.node_count).to eq(3)
       end
+
+      it "honors config.simplecov_node_count_override when set" do
+        config.simplecov_node_count_override = 9
+        merged = {}
+        3.times do |i|
+          merged["RSpec-#{i}-node#{i}"] = {
+            "coverage" => { "/app/models/user.rb" => { "lines" => [1, nil], "branches" => {} } },
+            "timestamp" => i
+          }
+        end
+        File.write(File.join(tmpdir, "coverage/.resultset.json"), JSON.generate(merged))
+        loader.load_all
+        expect(loader.node_count).to eq(9)
+      end
+    end
+
+    describe "#file_load_counts" do
+      it "tracks how many shards' coverage contained each file" do
+        # Two shards: shard 0 sees both files, shard 1 only the first
+        merged = {
+          "RSpec-0-node0" => {
+            "coverage" => {
+              "/app/models/user.rb"  => { "lines" => [1, nil], "branches" => {} },
+              "/app/models/order.rb" => { "lines" => [1, nil], "branches" => {} }
+            },
+            "timestamp" => 1
+          },
+          "RSpec-1-node1" => {
+            "coverage" => {
+              "/app/models/user.rb"  => { "lines" => [1, nil], "branches" => {} }
+            },
+            "timestamp" => 2
+          }
+        }
+        File.write(File.join(tmpdir, "coverage/.resultset.json"), JSON.generate(merged))
+        loader.load_all
+        expect(loader.file_load_counts["/app/models/user.rb"]).to eq(2)
+        expect(loader.file_load_counts["/app/models/order.rb"]).to eq(1)
+      end
     end
   end
 

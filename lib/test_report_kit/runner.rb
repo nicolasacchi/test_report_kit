@@ -194,7 +194,8 @@ module TestReportKit
         git_churn_data: loader.git_churn_data,
         diff_coverage: diff_coverage,
         config: @config,
-        node_count: loader.node_count
+        node_count: loader.node_count,
+        file_load_counts: loader.file_load_counts
       ).call
 
       md_exporter = MarkdownExporter.new(

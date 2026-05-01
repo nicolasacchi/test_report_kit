@@ -16,7 +16,8 @@ module TestReportKit
                   :event_prof_event,
                   :fail_on_coverage,
                   :fail_on_diff_coverage,
-                  :simplecov_track_files
+                  :simplecov_track_files,
+                  :simplecov_node_count_override
 
     def initialize
       @project_name             = nil
@@ -39,6 +40,12 @@ module TestReportKit
       # no longer changes which files are "seen"). Set to nil to opt out and match a
       # Codecov-style number that only counts files actually autoloaded.
       @simplecov_track_files    = "{app,lib}/**/*.rb"
+      # Override for the auto-detected SimpleCov "load baseline" used by the
+      # `executed_coverage_pct` metric. By default DataLoader counts the number of
+      # distinct command_names in `.resultset.json` (= 1 for single-process, N for
+      # parallel-merged) and uses that per-file. Set this to pin a specific value
+      # if your setup mixes test types or has unusual command_name semantics.
+      @simplecov_node_count_override = nil
     end
 
     def resolved_project_name
