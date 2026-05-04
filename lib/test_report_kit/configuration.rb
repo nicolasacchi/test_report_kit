@@ -15,7 +15,8 @@ module TestReportKit
                   :github_url,
                   :event_prof_event,
                   :fail_on_coverage,
-                  :fail_on_diff_coverage
+                  :fail_on_diff_coverage,
+                  :simplecov_track_files
 
     def initialize
       @project_name             = nil
@@ -32,6 +33,10 @@ module TestReportKit
       @event_prof_event         = "factory.create"
       @fail_on_coverage         = false
       @fail_on_diff_coverage    = false
+      # Glob describing application code that SimpleCov is responsible for.
+      # Used by churn-based insights to skip non-Ruby files (locales, schema,
+      # migrations, JSON fixtures) that show up in git churn but aren't testable.
+      @simplecov_track_files    = "{app,lib}/**/*.rb"
     end
 
     def resolved_project_name
