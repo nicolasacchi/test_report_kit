@@ -3,6 +3,15 @@
 require "set"
 
 module TestReportKit
+  # Computes coverage for lines changed in the current branch against a base ref
+  # (`diff_base_branch`, default "main"). The base ref is used ONLY to derive the
+  # git diff (which lines changed) — coverage data from main is NEVER fetched or
+  # compared. Every run is independent: the percentage reflects only the current
+  # RSpec run's SimpleCov data, restricted to lines that appear in the diff.
+  #
+  # This intentionally provides a "you must test what you change" gate rather
+  # than a "your coverage didn't drop vs main" gate. For the latter, persist
+  # summary.json from main runs and compare client-side.
   class DiffCoverage
     HUNK_HEADER_RE = /^@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,(\d+))?\s+@@/
     DIFF_FILE_RE   = /^diff --git a\/.+ b\/(.+)$/

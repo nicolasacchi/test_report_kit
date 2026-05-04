@@ -99,6 +99,22 @@ load "tasks/test_report_kit.rake"
 | `fail_on_coverage` | `false` | Exit 1 if below `coverage_threshold` |
 | `fail_on_diff_coverage` | `false` | Exit 1 if below `diff_coverage_threshold` |
 
+### What "diff coverage" means here
+
+Diff coverage answers a single question: **of the lines you added or changed in this branch, what percentage are covered by the test suite running right now?**
+
+What it is NOT:
+
+- It is **not** a comparison against main's coverage.
+- It does **not** read or store any baseline. Each run is independent.
+- It does **not** show "+/- X% vs main" deltas (Codecov-style).
+
+The base branch (`diff_base_branch`, default `main`) is used **only to compute the git diff** (which lines changed), never to fetch coverage data from main.
+
+The gate (`fail_on_diff_coverage` + `diff_coverage_threshold`) enforces "every PR must cover ≥ N% of its own diff" — a stronger signal than absolute-coverage-didn't-drop, since it forces test discipline on the lines that actually changed.
+
+If you want Codecov-style "vs main" deltas, persist `summary.json` from main runs (e.g. as a long-retention CI artifact) and diff it client-side against PR runs. The gem doesn't do this for you.
+
 ## Output Files
 
 All written to `output_dir` (default `tmp/test_report/`):
