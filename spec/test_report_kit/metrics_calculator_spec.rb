@@ -173,5 +173,24 @@ RSpec.describe TestReportKit::MetricsCalculator do
       paths = hot.map { |f| f[:path] }
       expect(paths).to include("app/services/pricing_engine.rb")
     end
+
+    context "when churn includes non-Ruby files" do
+      let(:git_churn_data) do
+        {
+          "days" => 90,
+          "files" => {
+            "config/locales/it.yml" => 56,
+            "db/schema.rb"          => 53,
+            "config/locales/en.yml" => 25,
+            "app/services/pricing_engine.rb" => 22
+          }
+        }
+      end
+
+      it "filters out files outside the simplecov_track_files glob" do
+        paths = result[:insights][:untested_hot_paths].map { |f| f[:path] }
+        expect(paths).to eq(["app/services/pricing_engine.rb"])
+      end
+    end
   end
 end

@@ -332,8 +332,14 @@ module TestReportKit
 
       churn_files = @git_churn["files"] || {}
       coverage_map = file_coverage_list.each_with_object({}) { |f, h| h[f[:path]] = f[:coverage_pct] }
+      fnm_flags = File::FNM_PATHNAME | File::FNM_EXTGLOB
 
       churn_files.filter_map do |path, commits|
+        # Only flag files that SimpleCov could have tracked. Without this, churned
+        # non-Ruby files (locales, schema.rb, migrations, JSON fixtures) show up
+        # as "0% coverage" hot paths even though they're not testable code.
+        next unless File.fnmatch?(@config.simplecov_track_files, path, fnm_flags)
+
         cov = coverage_map[path]
         next unless commits > 10 && (cov.nil? || cov < 40)
 
