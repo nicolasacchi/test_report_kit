@@ -5,6 +5,11 @@ require "time"
 
 module TestReportKit
   class MarkdownExporter
+    # GitHub PR/issue comment bodies are capped at 65,536 chars. Stay well below so
+    # callers (e.g. CI workflows) can prepend headers / append download links without
+    # blowing the limit.
+    MAX_BYTES = 60_000
+
     def initialize(metrics:, diff_coverage:, config: TestReportKit.configuration)
       @metrics       = metrics
       @diff_coverage = diff_coverage
@@ -27,11 +32,21 @@ module TestReportKit
         sections << low_coverage_section
         sections << factory_section
         sections << action_items_section
-        sections.compact.join("\n\n---\n\n")
+        body = sections.compact.join("\n\n---\n\n")
+        truncate(body)
       end
     end
 
     private
+
+    def truncate(body)
+      return body if body.bytesize <= MAX_BYTES
+
+      notice = "\n\n---\n\n_Report truncated (#{body.bytesize} → #{MAX_BYTES} bytes). " \
+               "See the full HTML report in the workflow artifact._\n"
+      keep = MAX_BYTES - notice.bytesize
+      body.byteslice(0, keep) + notice
+    end
 
     def header_section
       "# Test Report: #{@config.resolved_project_name}\n\n" \
