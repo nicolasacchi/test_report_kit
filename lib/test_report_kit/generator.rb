@@ -2,6 +2,7 @@
 
 require "erb"
 require "json"
+require "set"
 require "fileutils"
 require "strscan"
 
@@ -120,6 +121,43 @@ module TestReportKit
 
     def diff_cov
       @diff_coverage
+    end
+
+    # ── PR scope helpers (used by dashboard's PR-only filter) ──
+    #
+    # When diff coverage is available, has_pr? is true and the dashboard
+    # adds a top-level toggle (default: PR only) that filters every
+    # file-listing table to rows whose path matches a PR-changed file
+    # (or, for spec-file rows, whose source equivalent is in the PR).
+
+    def pr_files_set
+      @pr_files_set ||= @diff_coverage ? Set.new(@diff_coverage.files.map(&:path)) : nil
+    end
+
+    def pr_spec_files_set
+      @pr_spec_files_set ||= begin
+        paths = @metrics.dig(:pr_metrics, :pr_spec_paths)
+        paths ? Set.new(paths) : nil
+      end
+    end
+
+    def pr_metrics
+      @metrics[:pr_metrics]
+    end
+
+    def has_pr?
+      pr_files_set && !pr_files_set.empty?
+    end
+
+    def in_pr?(path)
+      return false unless pr_files_set
+      pr_files_set.include?(path.to_s)
+    end
+
+    def in_pr_spec?(spec_file)
+      return false unless pr_spec_files_set
+      normalized = spec_file.to_s.sub(%r{^\./}, "").split(":").first
+      pr_spec_files_set.include?(normalized)
     end
 
     def rspec_dissect_data

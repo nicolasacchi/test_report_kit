@@ -31,7 +31,24 @@ RSpec.describe TestReportKit::MarkdownExporter do
         untested_hot_paths: [{ path: "app/services/pricing.rb", churn: 15 }],
         over_tested: [], false_security: []
       },
-      slowest_tests: []
+      slowest_tests: [],
+      pr_metrics: {
+        file_count: 1,
+        diff_coverage_pct: 62.5,
+        diff_coverage_threshold: 90,
+        diff_coverage_passed: false,
+        files: [{ path: "app/services/cart.rb", coverage_pct: 33.3, uncovered: 2, not_loaded: false }],
+        related_test_count: 4,
+        related_passes: 4,
+        related_failures: 0,
+        related_total_test_time: 1.23,
+        related_total_test_time_formatted: "1s",
+        related_slowest_tests: [
+          { description: "Cart#optimize handles empty", file: "spec/services/cart_spec.rb:10", duration: 0.5, status: "passed", slow: false }
+        ],
+        pr_paths: ["app/services/cart.rb"],
+        pr_spec_paths: ["spec/services/cart_spec.rb"]
+      }
     }
   end
 
@@ -67,36 +84,73 @@ RSpec.describe TestReportKit::MarkdownExporter do
       expect(path).to end_with("report.md")
     end
 
-    it "includes summary stats" do
+    it "includes overall stats" do
       exporter.export
       md = File.read(File.join(tmpdir, "report.md"))
+      expect(md).to include("## Overall")
       expect(md).to include("70.0%")
-      expect(md).to include("50")
+      expect(md).to include("50 examples")
     end
 
-    it "includes diff coverage details" do
+    it "includes a 'This PR' section with file count, diff coverage, and related tests" do
       exporter.export
       md = File.read(File.join(tmpdir, "report.md"))
+      expect(md).to include("## This PR")
+      expect(md).to include("Files changed | 1")
       expect(md).to include("62.5%")
+      expect(md).to include("Related tests | 4 examples")
+    end
+
+    it "lists files changed in the PR" do
+      exporter.export
+      md = File.read(File.join(tmpdir, "report.md"))
+      expect(md).to include("### Files changed")
+      expect(md).to include("`app/services/cart.rb`")
+    end
+
+    it "lists slowest related tests when present" do
+      exporter.export
+      md = File.read(File.join(tmpdir, "report.md"))
+      expect(md).to include("### Slowest related tests")
+      expect(md).to include("Cart#optimize handles empty")
+    end
+
+    it "includes uncovered changes (diff coverage code excerpts)" do
+      exporter.export
+      md = File.read(File.join(tmpdir, "report.md"))
+      expect(md).to include("## Uncovered Changes")
       expect(md).to include("cart.rb")
       expect(md).to include("raise 'error'")
     end
 
-    it "includes action items" do
+    it "includes action items focused on the PR" do
       exporter.export
       md = File.read(File.join(tmpdir, "report.md"))
-      expect(md).to include("Action Items")
+      expect(md).to include("## Action Items")
       expect(md).to include("Diff coverage below threshold")
-      expect(md).to include("Untested hot path")
+      # Global insights (high_risk, untested_hot_paths) are no longer in the comment
+      expect(md).not_to include("Untested hot path")
+      expect(md).not_to include("High-risk")
     end
 
-    it "includes low coverage files" do
+    it "no longer lists global low-coverage files (kept in HTML report only)" do
       exporter.export
       md = File.read(File.join(tmpdir, "report.md"))
-      expect(md).to include("Below 80%")
-      expect(md).to include("cart.rb")
-      # 90% file should NOT be in "below 80%" section
+      expect(md).not_to include("Below 80%")
+      # The 90% file is not under any section
       expect(md).not_to include("| `app/models/order.rb`")
+    end
+
+    context "when there is no diff coverage (e.g. running on main)" do
+      let(:diff_coverage) { nil }
+      let(:metrics) { super().merge(pr_metrics: nil) }
+
+      it "still produces overall metrics, no PR section" do
+        exporter.export
+        md = File.read(File.join(tmpdir, "report.md"))
+        expect(md).to include("## Overall")
+        expect(md).not_to include("## This PR")
+      end
     end
   end
 end

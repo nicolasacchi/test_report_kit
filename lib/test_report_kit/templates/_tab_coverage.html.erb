@@ -27,7 +27,7 @@
     </thead>
     <tbody>
       <% file_coverage.each do |f| -%>
-      <tr class="cov-file-row" data-cov-pct="<%= f[:coverage_pct] %>" data-path="<%= h(f[:path]) %>"<%= f[:coverage_pct] >= 100 ? ' style="display:none;"' : '' %>>
+      <tr class="cov-file-row" data-cov-pct="<%= f[:coverage_pct] %>" data-path="<%= h(f[:path]) %>" data-in-pr="<%= in_pr?(f[:path]) %>"<%= f[:coverage_pct] >= 100 ? ' style="display:none;"' : '' %>>
         <td><div class="file-path"><%= file_link(f[:path]) %></div></td>
         <td>
           <div class="cov-bar">

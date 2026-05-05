@@ -85,6 +85,17 @@
   .delta-down { color: var(--red); background: var(--red-dim); }
   .card-glow { position: absolute; top: -40px; right: -40px; width: 120px; height: 120px; border-radius: 50%; filter: blur(50px); opacity: 0.15; pointer-events: none; }
 
+  .scope-toggle { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px; margin: 0 0 20px; flex-wrap: wrap; }
+  .scope-toggle-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); }
+  .scope-toggle label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); cursor: pointer; user-select: none; }
+  .scope-toggle input[type="radio"] { cursor: pointer; accent-color: var(--accent); }
+  .scope-toggle-hint { font-size: 11px; color: var(--text-muted); margin-left: auto; font-family: var(--mono); }
+  .scope-count { font-family: var(--mono); font-size: 11px; background: var(--accent-glow); color: var(--accent); padding: 1px 6px; border-radius: 4px; margin-left: 2px; }
+  body.pr-only-mode tr[data-in-pr="false"] { display: none; }
+  body.pr-only-mode .insight-section[data-in-pr-empty="true"] .pr-empty-note { display: block; }
+  body.pr-only-mode .insight-section[data-in-pr-empty="true"] table { display: none; }
+  .pr-empty-note { display: none; padding: 12px 20px; color: var(--text-muted); font-size: 12px; font-style: italic; }
+
   .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
   .tab { padding: 12px 24px; font-size: 13px; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; user-select: none; letter-spacing: 0.2px; }
   .tab:hover { color: var(--text-secondary); }
@@ -207,6 +218,16 @@
   <!-- SUMMARY CARDS -->
   <%= render_partial("summary_cards") %>
 
+  <% if has_pr? -%>
+  <!-- PR SCOPE TOGGLE -->
+  <div class="scope-toggle">
+    <span class="scope-toggle-label">Scope:</span>
+    <label><input type="radio" name="scope" value="pr" checked> PR only <span class="scope-count"><%= pr_files_set.size %> file<%= pr_files_set.size == 1 ? "" : "s" %></span></label>
+    <label><input type="radio" name="scope" value="all"> Everything</label>
+    <span class="scope-toggle-hint">filters file-listing tables to changed files</span>
+  </div>
+  <% end -%>
+
   <!-- TABS -->
   <div class="tabs">
     <div class="tab active" data-tab="diff">Diff Coverage</div>
@@ -258,6 +279,46 @@
 <script type="text/plain" id="report-md"><%= embedded_markdown %></script>
 <% end -%>
 <script>
+// PR scope toggle
+//
+// When diff coverage is available we show a top-level toggle that hides
+// rows whose data-in-pr attribute is "false". Default state is "pr".
+// Persists per-host in localStorage so a reviewer who flips to "all"
+// stays there across navigations.
+(function() {
+  var STORAGE_KEY = 'test_report_kit:scope';
+  var toggle = document.querySelector('.scope-toggle');
+  if (!toggle) return;
+
+  function applyScope(scope) {
+    document.body.classList.toggle('pr-only-mode', scope === 'pr');
+    toggle.querySelectorAll('input[type="radio"]').forEach(function(r) {
+      r.checked = (r.value === scope);
+    });
+    refreshInsightEmptiness();
+    try { localStorage.setItem(STORAGE_KEY, scope); } catch (_) {}
+  }
+
+  function refreshInsightEmptiness() {
+    document.querySelectorAll('.insight-section').forEach(function(section) {
+      var rows = section.querySelectorAll('tbody tr[data-in-pr]');
+      if (rows.length === 0) return;
+      var visible = Array.prototype.filter.call(rows, function(r) {
+        return r.getAttribute('data-in-pr') === 'true';
+      });
+      section.setAttribute('data-in-pr-empty', visible.length === 0 ? 'true' : 'false');
+    });
+  }
+
+  var saved = 'pr';
+  try { saved = localStorage.getItem(STORAGE_KEY) || 'pr'; } catch (_) {}
+  applyScope(saved === 'all' ? 'all' : 'pr');
+
+  toggle.querySelectorAll('input[type="radio"]').forEach(function(r) {
+    r.addEventListener('change', function() { applyScope(r.value); });
+  });
+})();
+
 // Tab switching
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {

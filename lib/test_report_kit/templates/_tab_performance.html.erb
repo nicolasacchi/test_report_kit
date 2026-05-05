@@ -41,8 +41,9 @@
     </thead>
     <tbody>
       <% time_by_file.each do |f| -%>
-      <tr>
-        <td><span class="file-path"><% fp = f[:file].to_s.sub(%r{^\./}, ''); %><%= file_link(fp) %></span></td>
+      <% fp = f[:file].to_s.sub(%r{^\./}, '') -%>
+      <tr data-in-pr="<%= in_pr_spec?(fp) %>">
+        <td><span class="file-path"><%= file_link(fp) %></span></td>
         <td><span class="num" style="font-weight: 700;"><%= f[:total_time] %>s</span></td>
         <td><span class="num"><%= f[:count] %></span></td>
         <td><span class="num"><%= f[:avg_time] %>s</span></td>
@@ -76,8 +77,9 @@
         parts = t[:file].to_s.sub(%r{^\./}, '').split(':')
         test_file = parts[0]
         test_line = parts[1]&.to_i
+        in_pr_attr = in_pr_spec?(test_file).to_s
       -%>
-      <tr class="perf-test-row" style="cursor: pointer;">
+      <tr class="perf-test-row" style="cursor: pointer;" data-in-pr="<%= in_pr_attr %>">
         <td style="color: var(--text-primary); max-width: 400px;"><%= h(t[:description]) %></td>
         <td><span class="file-path"><%= file_link(test_file, line: test_line) %><%= test_line ? ":#{test_line}" : "" %></span></td>
         <td><span class="num" style="color: <%= t[:slow] ? 'var(--red)' : 'var(--yellow)' %>; font-weight: 700;"><%= t[:duration] %>s</span></td>
@@ -85,7 +87,7 @@
       </tr>
       <% source_lines = build_test_source(test_file, test_line) -%>
       <% if source_lines -%>
-      <tr class="perf-test-detail" style="display:none;">
+      <tr class="perf-test-detail" data-in-pr="<%= in_pr_attr %>" style="display:none;">
         <td colspan="4" style="padding: 0;">
           <div style="padding: 12px 20px; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle);">
             <% if t[:exception] -%>
@@ -164,8 +166,9 @@
     </thead>
     <tbody>
       <% rspec_dissect_data["suites"].each do |suite| -%>
-      <tr>
-        <td><span class="file-path"><% loc_parts = suite["location"].to_s.sub('./', '').split(':'); %><%= file_link(loc_parts[0], line: loc_parts[1]&.to_i) %></span></td>
+      <% loc_parts = suite["location"].to_s.sub('./', '').split(':') -%>
+      <tr data-in-pr="<%= in_pr_spec?(loc_parts[0]) %>">
+        <td><span class="file-path"><%= file_link(loc_parts[0], line: loc_parts[1]&.to_i) %></span></td>
         <td><span class="num"><%= suite["total_time"] %></span></td>
         <td>
           <div class="time-bar">
@@ -205,8 +208,9 @@
     </thead>
     <tbody>
       <% event_prof_data["suites"].each do |suite| -%>
-      <tr>
-        <td><span class="file-path"><% ep_parts = suite["location"].to_s.sub('./', '').split(':'); %><%= file_link(ep_parts[0], line: ep_parts[1]&.to_i) %></span></td>
+      <% ep_parts = suite["location"].to_s.sub('./', '').split(':') -%>
+      <tr data-in-pr="<%= in_pr_spec?(ep_parts[0]) %>">
+        <td><span class="file-path"><%= file_link(ep_parts[0], line: ep_parts[1]&.to_i) %></span></td>
         <td><span class="num" style="font-weight: 700;"><%= suite["time"] %></span></td>
         <td><span class="num"><%= suite["event_count"] %></span></td>
         <td><span class="num"><%= suite["example_count"] %></span></td>
