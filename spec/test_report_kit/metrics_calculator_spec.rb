@@ -193,4 +193,77 @@ RSpec.describe TestReportKit::MetricsCalculator do
       end
     end
   end
+
+  describe "pr_metrics" do
+    context "without diff_coverage" do
+      it "is nil" do
+        expect(result[:pr_metrics]).to be_nil
+      end
+    end
+
+    context "with diff_coverage" do
+      let(:diff_coverage) do
+        TestReportKit::DiffCoverage::Result.new(
+          base_branch: "main", base_sha: "abc", head_sha: "def",
+          total_changed_lines: 5, executable_changed_lines: 4,
+          covered_changed_lines: 2, uncovered_changed_lines: 2,
+          diff_coverage_pct: 50.0, threshold: 90, passed: false,
+          files: [
+            TestReportKit::DiffCoverage::FileCoverage.new(
+              path: "app/services/cart_optimizer.rb",
+              changed_lines: [4, 5], covered_lines: [4], uncovered_lines: [5],
+              non_executable_lines: [], diff_coverage_pct: 50.0,
+              not_loaded: false, uncovered_content: []
+            )
+          ]
+        )
+      end
+
+      it "computes file_count and diff_coverage data" do
+        pr = result[:pr_metrics]
+        expect(pr[:file_count]).to eq(1)
+        expect(pr[:diff_coverage_pct]).to eq(50.0)
+        expect(pr[:diff_coverage_threshold]).to eq(90)
+        expect(pr[:diff_coverage_passed]).to be(false)
+      end
+
+      it "exposes pr_paths and pr_spec_paths via Rails convention" do
+        pr = result[:pr_metrics]
+        expect(pr[:pr_paths]).to eq(["app/services/cart_optimizer.rb"])
+        expect(pr[:pr_spec_paths]).to include("spec/services/cart_optimizer_spec.rb")
+      end
+
+      it "scopes related tests by spec file path" do
+        pr = result[:pr_metrics]
+        # rspec_data fixture contains examples in spec/services/cart_optimizer_spec.rb
+        expect(pr[:related_test_count]).to be > 0
+        expect(pr[:related_total_test_time]).to be > 0
+      end
+
+      context "for files under lib/" do
+        let(:diff_coverage) do
+          TestReportKit::DiffCoverage::Result.new(
+            base_branch: "main", base_sha: "abc", head_sha: "def",
+            total_changed_lines: 1, executable_changed_lines: 1,
+            covered_changed_lines: 0, uncovered_changed_lines: 1,
+            diff_coverage_pct: 0.0, threshold: 90, passed: false,
+            files: [
+              TestReportKit::DiffCoverage::FileCoverage.new(
+                path: "lib/foo/bar.rb",
+                changed_lines: [10], covered_lines: [], uncovered_lines: [10],
+                non_executable_lines: [], diff_coverage_pct: 0.0,
+                not_loaded: true, uncovered_content: []
+              )
+            ]
+          )
+        end
+
+        it "considers both spec/X_spec.rb and spec/lib/X_spec.rb candidates" do
+          pr = result[:pr_metrics]
+          expect(pr[:pr_spec_paths]).to include("spec/foo/bar_spec.rb")
+          expect(pr[:pr_spec_paths]).to include("spec/lib/foo/bar_spec.rb")
+        end
+      end
+    end
+  end
 end

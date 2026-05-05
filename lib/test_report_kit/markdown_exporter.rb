@@ -23,14 +23,23 @@ module TestReportKit
       output_path
     end
 
+    # The comment is intentionally split into two scopes:
+    #   1. **Overall** — totals over the whole suite (coverage %, test count,
+    #      duration, factory creates). No per-file lists.
+    #   2. **This PR** — only files changed on the current branch + the rspec
+    #      examples whose spec file maps to one of those source files (mapped
+    #      by Rails convention in MetricsCalculator#candidate_spec_paths).
+    #
+    # Per-file detail (low-coverage tables, global insights) is intentionally
+    # omitted — the full HTML report covers that and the comment should stay
+    # actionable for the reviewer reading a PR.
     def build
       @build ||= begin
         sections = []
         sections << header_section
-        sections << summary_section
+        sections << overall_section
+        sections << pr_section
         sections << diff_coverage_section
-        sections << low_coverage_section
-        sections << factory_section
         sections << action_items_section
         body = sections.compact.join("\n\n---\n\n")
         truncate(body)
@@ -54,10 +63,12 @@ module TestReportKit
       "Branch: `#{branch}` | SHA: `#{sha}`"
     end
 
-    def summary_section
+    def overall_section
       cov = @metrics[:overall_coverage]
       rspec = @metrics[:rspec_summary]
-      lines = ["## Summary\n"]
+      factory = @metrics[:factory_health]
+
+      lines = ["## Overall\n"]
       lines << "| Metric | Value |"
       lines << "|--------|-------|"
       if cov
@@ -65,23 +76,62 @@ module TestReportKit
         lines << "| Branch Coverage | #{cov[:branch_coverage_pct]}% |"
       end
       if rspec
+        lines << "| Tests | #{rspec[:example_count]} examples (#{rspec[:failure_count]} failures, #{rspec[:pending_count]} pending) |"
         lines << "| Duration | #{rspec[:duration_formatted]} |"
-        lines << "| Examples | #{rspec[:example_count]} (#{rspec[:failure_count]} failures, #{rspec[:pending_count]} pending) |"
       end
-      if @diff_coverage
-        lines << "| Diff Coverage | #{@diff_coverage.diff_coverage_pct || 'N/A'}% (#{@diff_coverage.covered_changed_lines}/#{@diff_coverage.executable_changed_lines} changed lines) |"
-        lines << "| Diff Threshold | #{@diff_coverage.threshold}% — #{@diff_coverage.passed ? 'PASS' : 'FAIL'} |"
-      end
-      factory = @metrics[:factory_health]
       lines << "| Factory Creates | #{factory[:total_count]} |" if factory
+      lines.join("\n")
+    end
+
+    def pr_section
+      pr = @metrics[:pr_metrics]
+      return nil unless pr && pr[:file_count] > 0
+
+      lines = ["## This PR\n"]
+      lines << "| Metric | Value |"
+      lines << "|--------|-------|"
+      lines << "| Files changed | #{pr[:file_count]} |"
+      diff_pct = pr[:diff_coverage_pct] ? "#{pr[:diff_coverage_pct]}%" : "N/A"
+      gate = "(gate #{pr[:diff_coverage_threshold]}% — #{pr[:diff_coverage_passed] ? 'PASS' : 'FAIL'})"
+      lines << "| Diff Coverage | #{diff_pct} #{gate} |"
+      if pr[:related_test_count] > 0
+        lines << "| Related tests | #{pr[:related_test_count]} examples (#{pr[:related_passes]} passed, #{pr[:related_failures]} failed) |"
+        lines << "| Related test time | #{pr[:related_total_test_time_formatted]} |"
+      end
+
+      if pr[:files].any?
+        lines << ""
+        lines << "### Files changed"
+        lines << "| File | Diff Coverage | Uncovered |"
+        lines << "|------|---------------|-----------|"
+        pr[:files].each do |f|
+          pct = f[:not_loaded] ? "not loaded" : (f[:coverage_pct] ? "#{f[:coverage_pct]}%" : "N/A")
+          lines << "| `#{f[:path]}` | #{pct} | #{f[:uncovered]} |"
+        end
+      end
+
+      if pr[:related_slowest_tests].any?
+        lines << ""
+        lines << "### Slowest related tests"
+        lines << "| Test | Duration | Status |"
+        lines << "|------|----------|--------|"
+        pr[:related_slowest_tests].each do |t|
+          desc = t[:description].to_s[0..80]
+          lines << "| #{desc} | #{t[:duration]}s | #{t[:status]} |"
+        end
+      end
+
       lines.join("\n")
     end
 
     def diff_coverage_section
       return nil unless @diff_coverage
 
-      lines = ["## Diff Coverage Details\n"]
-      @diff_coverage.files.each do |f|
+      relevant = @diff_coverage.files.select { |f| f.uncovered_lines.any? || f.not_loaded }
+      return nil if relevant.empty?
+
+      lines = ["## Uncovered Changes\n"]
+      relevant.each do |f|
         status = f.not_loaded ? "NOT LOADED BY TESTS" : "#{f.diff_coverage_pct}%"
         lines << "### `#{f.path}` — #{status}\n"
 
@@ -89,8 +139,6 @@ module TestReportKit
           lines << "> This file was never loaded during the test suite. All #{f.uncovered_lines.size} changed lines are uncovered.\n"
           next
         end
-
-        next unless f.uncovered_lines.any?
 
         lines << "Uncovered lines: `#{f.uncovered_lines.join(', ')}`\n"
         lines << "```ruby"
@@ -100,30 +148,6 @@ module TestReportKit
           lines << "#{prefix}#{entry[:line]}: #{entry[:content]}"
         end
         lines << "```"
-      end
-      lines.join("\n")
-    end
-
-    def low_coverage_section
-      files = (@metrics[:file_coverage] || []).select { |f| f[:coverage_pct] < 80 }
-      return nil if files.empty?
-
-      lines = ["## Files Below 80% Coverage\n"]
-      lines << "| File | Coverage | Missed | Churn | Risk |"
-      lines << "|------|----------|--------|-------|------|"
-      files.each do |f|
-        lines << "| `#{f[:path]}` | #{f[:coverage_pct]}% | #{f[:missed_lines]} | #{f[:churn]} | #{f[:risk_score]} |"
-      end
-      lines.join("\n")
-    end
-
-    def factory_section
-      health = @metrics[:factory_health]
-      return nil unless health && health[:suggestions]&.any?
-
-      lines = ["## Factory Optimization Suggestions\n"]
-      health[:suggestions].each do |s|
-        lines << "- **#{s[:severity]}**: #{s[:message]}"
       end
       lines.join("\n")
     end
@@ -138,12 +162,9 @@ module TestReportKit
         end
       end
 
-      insights = @metrics[:insights] || {}
-      (insights[:high_risk] || []).first(5).each do |f|
-        items << "- [ ] **High-risk** `#{f[:path]}`: #{f[:coverage_pct]}% coverage, #{f[:churn]} commits"
-      end
-      (insights[:untested_hot_paths] || []).first(3).each do |f|
-        items << "- [ ] **Untested hot path** `#{f[:path]}`: #{f[:churn]} commits, 0% coverage"
+      pr = @metrics[:pr_metrics]
+      if pr && pr[:related_failures].to_i > 0
+        items << "- [ ] **#{pr[:related_failures]} failing test(s) in PR-related files**"
       end
 
       return nil if items.empty?

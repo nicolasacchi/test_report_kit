@@ -26,11 +26,81 @@ module TestReportKit
         time_by_file: time_by_file,
         factory_health: factory_health,
         risk_scores: risk_scores,
-        insights: insights
+        insights: insights,
+        pr_metrics: pr_metrics
       }
     end
 
     private
+
+    # ── PR scope ──
+    #
+    # When diff coverage is available we expose a "PR scope" — the set of
+    # source files changed in the current branch plus the rspec examples
+    # whose spec file maps to one of those source files (Rails convention:
+    # `app/X/Y.rb` ↔ `spec/X/Y_spec.rb`, `lib/X.rb` ↔ `spec/X_spec.rb` or
+    # `spec/lib/X_spec.rb`). Used by the dashboard's PR-only filter and by
+    # the markdown exporter to scope the comment to PR-related metrics.
+
+    def pr_metrics
+      return nil unless @diff_coverage
+
+      pr_paths = @diff_coverage.files.map(&:path)
+      pr_spec_paths = pr_paths.flat_map { |p| candidate_spec_paths(p) }.uniq
+
+      pr_examples = (@rspec&.dig("examples") || []).select do |e|
+        spec_path = e["file_path"].to_s.sub(%r{^\./}, "")
+        pr_spec_paths.include?(spec_path)
+      end
+
+      total_time = pr_examples.sum { |e| (e["run_time"] || 0).to_f }
+      slowest = pr_examples
+        .select { |e| e["run_time"] && e["status"] != "pending" }
+        .sort_by { |e| -e["run_time"] }
+        .first(5)
+        .map { |e| map_test(e) }
+
+      passes = pr_examples.count { |e| e["status"] == "passed" }
+      failures = pr_examples.count { |e| e["status"] == "failed" }
+
+      {
+        file_count: pr_paths.size,
+        diff_coverage_pct: @diff_coverage.diff_coverage_pct,
+        diff_coverage_threshold: @diff_coverage.threshold,
+        diff_coverage_passed: @diff_coverage.passed,
+        files: @diff_coverage.files.map do |f|
+          {
+            path: f.path,
+            coverage_pct: f.diff_coverage_pct,
+            uncovered: f.uncovered_lines.size,
+            not_loaded: f.not_loaded
+          }
+        end,
+        related_test_count: pr_examples.size,
+        related_passes: passes,
+        related_failures: failures,
+        related_total_test_time: total_time.round(2),
+        related_total_test_time_formatted: format_duration(total_time),
+        related_slowest_tests: slowest,
+        pr_paths: pr_paths,
+        pr_spec_paths: pr_spec_paths
+      }
+    end
+
+    def candidate_spec_paths(source_path)
+      return [] unless source_path.end_with?(".rb")
+
+      paths = []
+      if source_path.start_with?("app/")
+        inner = source_path.sub(%r{^app/}, "").sub(/\.rb$/, "")
+        paths << "spec/#{inner}_spec.rb"
+      elsif source_path.start_with?("lib/")
+        inner = source_path.sub(%r{^lib/}, "").sub(/\.rb$/, "")
+        paths << "spec/#{inner}_spec.rb"
+        paths << "spec/lib/#{inner}_spec.rb"
+      end
+      paths
+    end
 
     # ── Overall coverage ──
 
